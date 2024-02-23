@@ -125,7 +125,8 @@ function esim_research_migration_abstract_bulk_approval_form_submit($form, &$for
 							':submitted_abstract_id' => $abstract_data->id
 						));
 					} //$abstract_data = $abstracts_q->fetchObject()
-					drupal_set_message(t('Approved Research Migration project.'), 'status');
+					drupal_set_message(t('Approved Research Migration Project. Use the checkbox below to publish this Research Migration on the completed Research Migration page.'), 'status');
+					drupal_goto('research-migration-project/manage-proposal/status/' . $form_state['values']['research_migration_project']);
 					// email 
 					$email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been approved', array(
 						'!site_name' => variable_get('site_name', '')
