@@ -192,7 +192,7 @@ FOSSEE,IIT Bombay', array(
 							':submitted_abstract_id' => $abstract_data->id
 						));
 					} //$abstract_data = $abstracts_q->fetchObject()
-					drupal_set_message(t('Resubmit the project files'), 'status');
+					drupal_set_message(t('The proposal has been marked for resubmission'), 'status');
 					// email 
 					$email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been marked as pending', array(
 						'!site_name' => variable_get('site_name', '')
@@ -258,7 +258,7 @@ FOSSEE,IIT Bombay', array(
 						0 => t('
 Dear ' . $user_info->contributor_name . ',
 
-Your uploaded Research Migration project files for the Research Migration project Title : ' . $user_info->project_title . ' have been marked as dis-approved.
+We regret to inform you that the project files submitted for the Research Migration project title: ' . $user_info->project_title . ' are disapproved by the reviewer.
 
 Reason for dis-approval: ' . $form_state['values']['message'] . '
 

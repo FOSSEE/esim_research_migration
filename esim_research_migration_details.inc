@@ -13,7 +13,7 @@ function esim_research_migration_completed_proposals_all()
 	//var_dump($research_migration_abstract);die;
 	if ($result->rowCount() == 0)
 	{
-		$output .= "Work has been completed for the following research migrations. We welcome your contributions." ."<hr>";
+		$output .= "Currently, there are no submissions in this section. Click <a href='proposal'>here</a> to propose a Research Migration Project." ."<hr>";
 
 	} //$result->rowCount() == 0
 	else
@@ -30,13 +30,12 @@ function esim_research_migration_completed_proposals_all()
 			$query1->condition('proposal_id', $proposal_id);
 			$research_migration_files = $query1->execute();
 			$research_migration_abstract = $research_migration_files->fetchObject();
-			$solver_used = $row->solver_used;
-			$project_title = l($row->project_title, "research-migration-project/research-migration-run/" . $row->id) . $solver_used . t(")</strong>") ;
+			
+			$project_title = l($row->project_title, "research-migration-project/research-migration-run/" . $row->id) . t(")</strong>") ;
 			$year = date("Y", $row->actual_completion_date);
 			$preference_rows[] = array(
 				$i,
 				$project_title,
-				//$solver_used,
 				$row->contributor_name,
 				$row->university,
 				$year
@@ -46,7 +45,6 @@ function esim_research_migration_completed_proposals_all()
 		$preference_header = array(
 			'No',
 			'Research Migration Project',
-			//'Solver used',
 			'Contributor Name',
 			'University/ Institute',
 			'Year of Completion'
@@ -69,11 +67,11 @@ function esim_research_migration_progress_all()
 	$result = $query->execute();
 	if ($result->rowCount() == 0)
 	{
-		$page_content .= "Work is in progress for the following research migration under Research Migration Project<hr>";
+		$page_content .= "Currently, there are no submissions in progress. Click <a href='proposal'>here</a> to propose a Research Migration Project.<hr>";
 	} //$result->rowCount() == 0
 	else
 	{
-		$page_content .= "Work is in progress for the following research migration under Research Migration Project<hr>";
+		$page_content .= "Work is in progress for the following submissions under the Research Migration Project<hr>";
 		$preference_rows = array();
 		$i = $result->rowCount();
 		while ($row = $result->fetchObject())

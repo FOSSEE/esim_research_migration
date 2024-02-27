@@ -478,6 +478,7 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
     state, 
     country,
     project_title, 
+	source_of_the_project,
     directory_name,
     approval_status,
     is_completed, 
@@ -503,7 +504,8 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
     :pincode, 
     :state,  
     :country,
-    :project_title, 
+    :project_title,
+	:source_of_the_project, 
     :directory_name,
     :approval_status,
     :is_completed, 
@@ -530,8 +532,7 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
 		":state" => $v['all_state'],
 		":country" => $v['country'],
 		":project_title" => $project_title,
-		
-		
+		":source_of_the_project" => trim($v['source_of_the_project']),
 		":directory_name" => $directory_name,
 		":approval_status" => 0,
 		":is_completed" => 0,

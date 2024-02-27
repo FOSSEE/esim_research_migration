@@ -13,7 +13,7 @@ function esim_research_migration_menu()
 {
     $items = array();
     /* PROPOSAL */
-    $items['lecture-videos/add'] =array(
+    /*$items['lecture-videos/add'] =array(
         'title' => 'Add Lecture Video',
         'description' => 'Add new lecture video',
         'page callback' => 'drupal_get_form',
@@ -52,7 +52,7 @@ function esim_research_migration_menu()
         ),
         'type' => MENU_NORMAL_ITEM,
         // 'file' => 'manage_proposal.inc',
-     );
+     );*/
     $items['research-migration-project/add-project-title'] = array(
         'title' => 'Add new project titles',
         'description' => 'Add new project titles',
@@ -388,14 +388,14 @@ function esim_research_migration_menu()
 function esim_research_migration_permission()
 {
     return array(
-        'manage lecture videos' => array(
-            'title' => t('Add/Manage lecture videos'),
-            'restrict access' => true,
-        ),
-        'view lecture videos' => array(
-            'title' => t('View lecture videos'),
-            'restrict access' => true,
-        ),
+        // 'manage lecture videos' => array(
+        //     'title' => t('Add/Manage lecture videos'),
+        //     'restrict access' => true,
+        // ),
+        // 'view lecture videos' => array(
+        //     'title' => t('View lecture videos'),
+        //     'restrict access' => true,
+        // ),
         // 'edit lecture videos' => array(
         //     'title' => t('edit lecture videos'),
         //     'restrict access' => true,
@@ -456,21 +456,21 @@ function esim_research_migration_permission()
             'title' => t('Research Migration generate abstract'),
             'restrict access' => true,
         ),
-        "list Research Migration certificates" => array(
-            "title" => t("list the certificates"),
-            "description" => t("list the certificates"),
-            'restrict access' => true,
-        ),
-        "list Research Migration custom certificates" => array(
-            "title" => t("list the mentor certificates"),
-            "description" => t("list the mentor certificates"),
-            'restrict access' => true,
-        ),
-        "verify rm certificates" => array(
-            "title" => t("verify the rm certificates"),
-            "description" => t("verify the rm certificates"),
-            "restrict access" => true,
-        ),
+        // "list Research Migration certificates" => array(
+        //     "title" => t("list the certificates"),
+        //     "description" => t("list the certificates"),
+        //     'restrict access' => true,
+        // ),
+        // "list Research Migration custom certificates" => array(
+        //     "title" => t("list the mentor certificates"),
+        //     "description" => t("list the mentor certificates"),
+        //     'restrict access' => true,
+        // ),
+        // "verify rm certificates" => array(
+        //     "title" => t("verify the rm certificates"),
+        //     "description" => t("verify the rm certificates"),
+        //     "restrict access" => true,
+        // ),
 
     );
 }

@@ -31,7 +31,7 @@ function esim_research_migration_settings_form($form, $form_state)
 	);
 	$form['extensions']['resource_upload'] = array(
 		'#type' => 'textfield',
-		'#title' => t('Allowed file extensions for uploading resource files'),
+		'#title' => t('Allowed file extensions for uploading synopsis in the proposal form'),
 		'#description' => t('A comma separated list WITHOUT SPACE of source file extensions that are permitted to be uploaded on the server'),
 		'#size' => 50,
 		'#maxlength' => 255,

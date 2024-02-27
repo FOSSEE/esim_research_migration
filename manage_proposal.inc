@@ -160,7 +160,7 @@ function esim_research_migration_proposal_edit_file_all()
             $approval_date,
             $actual_completion_date,
             $approval_status,
-            // l('Edit', 'research-migration-project/abstract-code/edit-upload-files/' . $proposal_data->id),
+            l('Edit', 'research-migration-project/abstract-code/edit-upload-files/' . $proposal_data->id),
         );
     } //$proposal_data = $proposal_q->fetchObject()
     /* check if there are any pending proposals */
@@ -307,7 +307,12 @@ function esim_research_migration_proposal_approval_form($form, &$form_state)
         '#title' => t('Title of the Research Migration Project'),
     );
    
-    
+    $form['source_of_the_project'] = array(
+		'#type' => 'item',
+		'#title' => t('Source of the Project'),
+        '#default_value' => $proposal_data->source_of_the_project,
+		'#disabled' => TRUE,
+	);
     $form['date_of_proposal'] = array(
         '#type' => 'textfield',
         '#title' => t('Date of Proposal'),
@@ -433,7 +438,7 @@ function esim_research_migration_proposal_approval_form_submit($form, &$form_sta
             drupal_set_message('Error sending email message.', 'error');
         }
 
-        drupal_set_message('esim research migration proposal No. ' . $proposal_id . ' approved. User has been notified of the approval.', 'status');
+        drupal_set_message('eSim Research Migration with proposal No. ' . $proposal_id . ' has been approved. The contributor has been notified of the approval', 'status');
         drupal_goto('research-migration-project/manage-proposal');
         return;
     } //$form_state['values']['approval'] == 1
@@ -467,7 +472,7 @@ function esim_research_migration_proposal_approval_form_submit($form, &$form_sta
             drupal_set_message('Error sending email message.', 'error');
         }
 
-        drupal_set_message('esim research migration proposal No. ' . $proposal_id . ' dis-approved. User has been notified of the dis-approval.', 'error');
+        drupal_set_message('eSim Research Migration with Proposal No. ' . $proposal_id . ' has been disapproved. The contributor has been notified of the disapproval.', 'error');
         drupal_goto('research-migration-project/manage-proposal');
         return;
     } //$form_state['values']['approval'] == 2
@@ -600,7 +605,13 @@ function esim_research_migration_proposal_status_form($form, &$form_state)
         '#markup' => $proposal_data->project_title,
         '#title' => t('Title of the Research Migration Project'),
     );
-   
+    $form['source_of_the_project'] = array(
+		'#type' => 'item',
+		'#title' => t('Source of the Project'),
+        '#default_value' => $proposal_data->source_of_the_project,
+        '#disabled' => TRUE,
+		
+	);
     /************************** reference link filter *******************/
     $url = '~(?:(https?)://([^\s<]+)|(www\.[^\s<]+?\.[^\s<]+))(?<![\.,:])~i';
     $reference = preg_replace($url, '<a href="$0" target="_blank" title="$0">$0</a>', $proposal_data->reference);
@@ -744,7 +755,7 @@ function esim_research_migration_proposal_status_form_submit($form, &$form_state
             drupal_set_message('Error sending email message.', 'error');
         }
 
-        drupal_set_message('Congratulations! esim research migration proposal has been marked as completed. User has been notified of the completion.', 'status');
+        drupal_set_message('eSim Research Migration proposal has been marked completed. The contributor is notified of the Completion.', 'status');
     }
     drupal_goto('research-migration-project/manage-proposal');
     return;
@@ -956,7 +967,13 @@ function esim_research_migration_proposal_edit_form($form, &$form_state)
         '#required' => true,
         '#default_value' => $proposal_data->project_title,
     );
-   
+    $form['source_of_the_project'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Source of the Project'),
+        '#default_value' => $proposal_data->source_of_the_project,
+        '#disabled' => TRUE,
+		
+	);
    /* $form['solver_used'] = array(
         '#type' => 'textfield',
         '#title' => t('Solver to be used'),
@@ -1077,7 +1094,7 @@ function esim_research_migration_proposal_edit_form_submit($form, &$form_state)
             drupal_set_message('Error sending email message.', 'error');
         }
 
-        drupal_set_message(t('research migration proposal has been deleted.'), 'status');
+        drupal_set_message(t('The Research Migration proposal has been deleted.'), 'status');
         if (_rm_rrmdir_project($proposal_id) == true) {
             $query = db_delete('research_migration_proposal');
             $query->condition('id', $proposal_id);

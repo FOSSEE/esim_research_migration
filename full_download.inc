@@ -61,7 +61,7 @@ function esim_research_migration_download_full_project()
 	} //$zip_file_count > 0
 	else {
 		drupal_set_message("There are no research migration project in this proposal to download", 'error');
-		drupal_goto('circuit-simulation-project/full-download/project');
+		drupal_goto('research-migration-project/full-download/project');
 	}
 }
 /*
@@ -126,6 +126,6 @@ function circuit_simulation_download_completed_project()
 	} //$zip_file_count > 0
 	else {
 		drupal_set_message("There are circuit simulation project in this proposal to download", 'error');
-		drupal_goto('circuit-simulation-project/full-download/project');
+		drupal_goto('research-migration-project/full-download/project');
 	}
 }*/

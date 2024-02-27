@@ -43,7 +43,7 @@ Your proposal is under review. You will soon receive an email when same has been
 Best Wishes,
 
 !site_name Team,
-FOSSEE,IIT Bombay', array(
+FOSSEE, IIT Bombay', array(
                     '!site_name' => variable_get('site_name', ''),
                     '!user_name' => $user->name,
                 ), array(
@@ -90,7 +90,7 @@ You are welcome to submit a new proposal.
 Best Wishes,
 
 !site_name Team,
-FOSSEE,IIT Bombay', array(
+FOSSEE, IIT Bombay', array(
                     '!site_name' => variable_get('site_name', ''),
                     '!user_name' => $user_data->name,
                 ), array(
@@ -134,7 +134,7 @@ You can upload your project files at: ' . $url . '
 Best Wishes,
 
 !site_name Team,
-FOSSEE,IIT Bombay', array(
+FOSSEE, IIT Bombay', array(
                     '!site_name' => variable_get('site_name', ''),
                     '!user_name' => $user_data->name,
                 ), array(
@@ -172,7 +172,7 @@ Project Title: ' . $proposal_data->project_title . '
 Best Wishes,
 
 !site_name Team,
-FOSSEE,IIT Bombay', array(
+FOSSEE, IIT Bombay', array(
                     '!site_name' => variable_get('site_name', ''),
                     '!user_name' => $user_data->name,
                 ), array(
@@ -213,7 +213,7 @@ You can propose a new Research Migration Project.
 Best Wishes,
 
 !site_name Team,
-FOSSEE,IIT Bombay', array(
+FOSSEE, IIT Bombay', array(
                     '!site_name' => variable_get('site_name', ''),
                     '!user_name' => $user_data->name,
                 ), array(
@@ -251,7 +251,7 @@ The synopsis and project files are under review. You will be notified when it ha
 Best Wishes,
 
 !site_name Team,
-FOSSEE,IIT Bombay', array(
+FOSSEE, IIT Bombay', array(
                     '!site_name' => variable_get('site_name', ''),
                     '!user_name' => $user->name,
                 ), array(
