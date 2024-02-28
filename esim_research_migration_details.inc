@@ -31,7 +31,7 @@ function esim_research_migration_completed_proposals_all()
 			$research_migration_files = $query1->execute();
 			$research_migration_abstract = $research_migration_files->fetchObject();
 			
-			$project_title = l($row->project_title, "research-migration-project/research-migration-run/" . $row->id) . t(")</strong>") ;
+			$project_title = l($row->project_title, "research-migration-project/research-migration-run/" . $row->id) . t("</strong>") ;
 			$year = date("Y", $row->actual_completion_date);
 			$preference_rows[] = array(
 				$i,

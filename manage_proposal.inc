@@ -608,8 +608,8 @@ function esim_research_migration_proposal_status_form($form, &$form_state)
     $form['source_of_the_project'] = array(
 		'#type' => 'item',
 		'#title' => t('Source of the Project'),
-        '#default_value' => $proposal_data->source_of_the_project,
-        '#disabled' => TRUE,
+        '#markup' => $proposal_data->source_of_the_project,
+       
 		
 	);
     /************************** reference link filter *******************/
