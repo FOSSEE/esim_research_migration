@@ -137,7 +137,7 @@ function _research_migration_details($research_migration_default_value)
 {
 	$research_migration_details = _research_migration_information($research_migration_default_value);
 	if ($research_migration_default_value != 0) {
-		$form['research_migration_details']['#markup'] = '<span style="color: rgb(128, 0, 0);"><strong>About the research migration</strong></span></td><td style="width: 35%;"><br />' . '<ul>' . '<li><strong>Proposer Name:</strong> ' . $research_migration_details->name_title . ' ' . $research_migration_details->contributor_name . '</li>' . '<li><strong>Title of the research migration:</strong> ' . $research_migration_details->project_title . '</li>' . '<li><strong>University:</strong> ' . $research_migration_details->university . '</li>' . '</ul>';
+		$form['research_migration_details']['#markup'] = '<span style="color: rgb(128, 0, 0);"><strong>About the research migration</strong></span></td><td style="width: 35%;"><br />' . '<ul>' . '<li><strong>Proposer Name:</strong> ' . $research_migration_details->name_title . ' ' . $research_migration_details->contributor_name . '</li>' . '<li><strong>Title of the research migration:</strong> ' . $research_migration_details->project_title . '</li>' . '<li><strong>Source of the Project:</strong> ' . $research_migration_details->source_of_the_project . '</li>' . '<li><strong>University:</strong> ' . $research_migration_details->university . '</li>' . '</ul>';
 		$details = $form['research_migration_details']['#markup'];
 		return $details;
 	} //$research_migration_default_value != 0

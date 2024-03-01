@@ -131,9 +131,8 @@ function esim_research_migration_upload_abstract_code_form($form, &$form_state)
     $form['upload_an_abstract'] = array(
 		'#type' => 'file',
 		'#title' => t('Upload an abstract of the project.') ,
-		'#description' => t('<span style="font-size:16px;">For a sample of the abstract <span style="font-size:20px;">&rarr;</span>
-			</span>' . '<br />' . t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_A_file->filename . '<br />' . t('<span style="color:red;">Allowed file extensions : ') . variable_get('research_migration_abstract_upload_extensions', '') . '</span>'
-	)));
+		'#description' => t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_A_file->filename . '<br />' . t('<span style="color:red;">Allowed file extensions : ') . variable_get('research_migration_abstract_upload_extensions', '') . '</span>'
+	));
     $existing_uploaded_S_file = default_value_for_uploaded_files("S", $proposal_data->id);
 	if (!$existing_uploaded_S_file)
 	{
@@ -319,9 +318,20 @@ function esim_research_migration_upload_abstract_code_form_submit($form, &$form_
 
                     if (file_exists($root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name])) {
                         //unlink($root_path . $dest_path . $_FILES['files']['name'][$file_form_name]);
+                        // move upload and update table file type and timestamp
+                        move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name]);
+                        $query = "UPDATE {research_migration_submitted_abstracts_file} SET filesize=:filesize, timestamp=:timestamp WHERE proposal_id = :proposal_id AND filetype = :filetype";
+                            $args = array(
+                                ":filesize" => $_FILES['files']['size'][$file_form_name],
+                                ":timestamp" => time(),
+                                ":proposal_id" => $proposal_id,
+                                ":filetype" => $file_type,
+                            );
+                            db_query($query, $args);
+
                         drupal_set_message(t("File !filename already exists hence overwirtten the exisitng file ", array(
                             '!filename' => $_FILES['files']['name'][$file_form_name],
-                        )), 'error');
+                        )), 'status');
                     } //file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
                     /* uploading file */
                     else if (move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name])) {
