@@ -818,7 +818,7 @@ function esim_research_migration_proposal_edit_form($form, &$form_state)
     );
     $form['university'] = array(
         '#type' => 'textfield',
-        '#title' => t('University/Institute'),
+        '#title' => t('University'),
         '#size' => 200,
         '#maxlength' => 200,
         '#required' => true,
@@ -862,103 +862,6 @@ function esim_research_migration_proposal_edit_form($form, &$form_state)
         '#validated' => true,
         '#default_value' => $proposal_data->faculty_email,
     );
-    $form['country'] = array(
-        '#type' => 'select',
-        '#title' => t('Country'),
-        '#options' => array(
-            'India' => 'India',
-            'Others' => 'Others',
-        ),
-        '#default_value' => $proposal_data->country,
-        '#required' => true,
-        '#tree' => true,
-        '#validated' => true,
-    );
-    $form['other_country'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Other than India'),
-        '#size' => 100,
-        '#default_value' => $proposal_data->country,
-        '#attributes' => array(
-            'placeholder' => t('Enter your country name'),
-        ),
-        '#states' => array(
-            'visible' => array(
-                ':input[name="country"]' => array(
-                    'value' => 'Others',
-                ),
-            ),
-        ),
-    );
-    $form['other_state'] = array(
-        '#type' => 'textfield',
-        '#title' => t('State other than India'),
-        '#size' => 100,
-        '#attributes' => array(
-            'placeholder' => t('Enter your state/region name'),
-        ),
-        '#default_value' => $proposal_data->state,
-        '#states' => array(
-            'visible' => array(
-                ':input[name="country"]' => array(
-                    'value' => 'Others',
-                ),
-            ),
-        ),
-    );
-    $form['other_city'] = array(
-        '#type' => 'textfield',
-        '#title' => t('City other than India'),
-        '#size' => 100,
-        '#attributes' => array(
-            'placeholder' => t('Enter your city name'),
-        ),
-        '#default_value' => $proposal_data->city,
-        '#states' => array(
-            'visible' => array(
-                ':input[name="country"]' => array(
-                    'value' => 'Others',
-                ),
-            ),
-        ),
-    );
-    $form['all_state'] = array(
-        '#type' => 'select',
-        '#title' => t('State'),
-        '#options' => _df_list_of_states(),
-        '#default_value' => $proposal_data->state,
-        '#validated' => true,
-        '#states' => array(
-            'visible' => array(
-                ':input[name="country"]' => array(
-                    'value' => 'India',
-                ),
-            ),
-        ),
-    );
-    $form['city'] = array(
-        '#type' => 'select',
-        '#title' => t('City'),
-        '#options' => _df_list_of_cities(),
-        '#default_value' => $proposal_data->city,
-        '#states' => array(
-            'visible' => array(
-                ':input[name="country"]' => array(
-                    'value' => 'India',
-                ),
-            ),
-        ),
-    );
-    $form['pincode'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Pincode'),
-        '#size' => 30,
-        '#maxlength' => 6,
-        '#default_value' => $proposal_data->pincode,
-        '#attributes' => array(
-            'placeholder' => 'Insert pincode of your city/ village....',
-        ),
-    );
     $form['project_title'] = array(
         '#type' => 'textfield',
         '#title' => t('Title of the Research Migration Project'),
@@ -971,7 +874,7 @@ function esim_research_migration_proposal_edit_form($form, &$form_state)
 		'#type' => 'textfield',
 		'#title' => t('Source of the Project'),
         '#default_value' => $proposal_data->source_of_the_project,
-        '#disabled' => TRUE,
+        // '#disabled' => TRUE,
 		
 	);
    /* $form['solver_used'] = array(
@@ -1129,10 +1032,8 @@ function esim_research_migration_proposal_edit_form_submit($form, &$form_state)
 				faculty_name = :faculty_name,
 				faculty_department = :faculty_department,
 				faculty_email = :faculty_email,
-				city=:city,
-				pincode=:pincode,
-				state=:state,
 				project_title=:project_title,
+                source_of_the_project =:source_of_the_project,
                 directory_name=:directory_name,
                 samplefilepath=:samplefilepath
 				WHERE id=:proposal_id";
@@ -1145,10 +1046,8 @@ function esim_research_migration_proposal_edit_form_submit($form, &$form_state)
         ":faculty_name" => $v['faculty_name'],
         ":faculty_department" => $v['faculty_department'],
         ":faculty_email" => $v['faculty_email'],
-        ':city' => $v['city'],
-        ':pincode' => $v['pincode'],
-        ':state' => $v['all_state'],
         ':project_title' => $project_title,
+        ':source_of_the_project' => $v['source_of_the_project'],
         ':directory_name' => $directory_name,
         ':samplefilepath' => $samplefilepath,
         ':proposal_id' => $proposal_id,
