@@ -331,7 +331,7 @@ function esim_research_migration_upload_abstract_code_form_submit($form, &$form_
 
                         drupal_set_message(t("File !filename already exists hence overwirtten the exisitng file ", array(
                             '!filename' => $_FILES['files']['name'][$file_form_name],
-                        )), 'error');
+                        )), 'status');
                     } //file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
                     /* uploading file */
                     else if (move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name])) {
