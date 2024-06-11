@@ -568,11 +568,11 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
 				//unlink($root_path . $dest_path . $_FILES['files']['name'][$file_form_name]);
 			} //file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
 			/* uploading file */
-			if (move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . $_FILES['files']['name'][$file_form_name]))
+			if (move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . 'abstract_' . $_FILES['files']['name'][$file_form_name]))
 			{
 				$query = "UPDATE {research_migration_proposal} SET samplefilepath = :samplefilepath WHERE id = :id";
 				$args = array(
-					":samplefilepath" => $dest_path . $_FILES['files']['name'][$file_form_name],
+					":samplefilepath" => $dest_path . 'abstract_' . $_FILES['files']['name'][$file_form_name],
 					":id" => $result1
 				);
 				
