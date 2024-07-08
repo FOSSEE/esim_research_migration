@@ -1012,8 +1012,8 @@ function esim_research_migration_proposal_edit_form_submit($form, &$form_state)
     $project_title = $v['project_title'];
     $proposar_name = $v['name_title'] . ' ' . $v['contributor_name'];
     $university = $v['university'];
-    $directory_names = _rm_df_dir_name($project_title, $proposar_name);
-    if (_rm_DF_RenameDir($proposal_id, $directory_names)) {
+    $directory_names = _rm_dir_name($project_title, $proposar_name);
+	if (_rm_RenameDir($proposal_id, $directory_names)) {
         $directory_name = $directory_names;
     } //LM_RenameDir($proposal_id, $directory_names)
     else {

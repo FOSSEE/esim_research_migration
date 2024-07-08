@@ -682,19 +682,20 @@ function _rm_list_of_solvers($simulation_id){
     return $solvers;
 }
 
-function _rm_df_dir_name($project, $proposar_name)
+function _rm_dir_name($project, $proposar_name)
 {
-    $project_title = ucname($project);
-    $proposar_name = ucname($proposar_name);
-    $dir_name = $project_title . ' By ' . $proposar_name;
-    $directory_name = str_replace("__", "_", str_replace(" ", "_", str_replace("/", "_", trim($dir_name))));
-    return $directory_name;
+   	$project_title = preg_replace("/_+/", "_",preg_replace('/[^A-Za-z0-9\-]/', '_', $project));
+	$proposar_name = $proposar_name;
+	$dir_name = $project_title . ' By ' . $proposar_name;
+	$directory_name = str_replace("__", "_", str_replace(" ", "_", str_replace("/","_", trim($dir_name))));
+	//var_dump($directory_name);die;
+	return $directory_name;
 }
 function esim_research_migration_document_path()
 {
     return $_SERVER['DOCUMENT_ROOT'] . base_path() . 'esim_uploads/research_migration_uploads/';
 }
-function _rm_DF_RenameDir($proposal_id, $dir_name)
+function _rm_RenameDir($proposal_id, $dir_name)
 {
     $proposal_id = $proposal_id;
     $dir_name = $dir_name;
