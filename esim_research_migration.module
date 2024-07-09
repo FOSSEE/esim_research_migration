@@ -456,21 +456,21 @@ function esim_research_migration_permission()
             'title' => t('Research Migration generate abstract'),
             'restrict access' => true,
         ),
-        // "list Research Migration certificates" => array(
-        //     "title" => t("list the certificates"),
-        //     "description" => t("list the certificates"),
-        //     'restrict access' => true,
-        // ),
-        // "list Research Migration custom certificates" => array(
-        //     "title" => t("list the mentor certificates"),
-        //     "description" => t("list the mentor certificates"),
-        //     'restrict access' => true,
-        // ),
-        // "verify rm certificates" => array(
-        //     "title" => t("verify the rm certificates"),
-        //     "description" => t("verify the rm certificates"),
-        //     "restrict access" => true,
-        // ),
+        "list Research Migration certificates" => array(
+            "title" => t("list the certificates"),
+            "description" => t("list the certificates"),
+            'restrict access' => true,
+        ),
+        "list Research Migration custom certificates" => array(
+            "title" => t("list the mentor certificates"),
+            "description" => t("list the mentor certificates"),
+            'restrict access' => true,
+        ),
+        "verify rm certificates" => array(
+            "title" => t("verify the rm certificates"),
+            "description" => t("verify the rm certificates"),
+            "restrict access" => true,
+        ),
 
     );
 }
