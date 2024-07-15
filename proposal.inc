@@ -459,7 +459,7 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
 	$project_title = trim($project_title);
 	$proposar_name = $v['name_title'] . ' ' . $v['contributor_name'];
 	$university = $v['university'];
-	$directory_name = _rm_df_dir_name($project_title, $proposar_name);
+	$directory_name = _rm_dir_name($project_title, $proposar_name);
 	$result = "INSERT INTO {research_migration_proposal} 
     (
     uid, 
