@@ -82,7 +82,7 @@ function esim_research_migration_progress_all()
 				$i,
 				$row->project_title,
 				$row->contributor_name,
-				$row->university,
+				$row->institute,
 				$approval_date
 			);
 			$i--;
@@ -91,7 +91,7 @@ function esim_research_migration_progress_all()
 			'No',
 			'Research Migration Project',
 			'Contributor Name',
-			'Institute/ University',
+			'Institute',
 			'Year'
 		);
 		$page_content .= theme('table', array(
