@@ -871,7 +871,7 @@ function esim_research_migration_proposal_edit_form($form, &$form_state)
         '#default_value' => $proposal_data->project_title,
     );
     $form['source_of_the_project'] = array(
-		'#type' => 'textfield',
+		'#type' => 'textarea',
 		'#title' => t('Source of the Project'),
         '#default_value' => $proposal_data->source_of_the_project,
         // '#disabled' => TRUE,
