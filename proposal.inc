@@ -258,7 +258,7 @@ function esim_research_migration_proposal_form($form, &$form_state, $no_js_use =
 		);
 	
 	$form['source_of_the_project'] = array(
-		'#type' => 'textfield',
+		'#type' => 'textarea',
 		'#title' => t('Source of the Project'),
 		// '#size' => 80,
 		// '#maxlength' => 200,
