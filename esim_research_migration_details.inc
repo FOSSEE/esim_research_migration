@@ -37,7 +37,7 @@ function esim_research_migration_completed_proposals_all()
 				$i,
 				$project_title,
 				$row->contributor_name,
-				$row->university,
+				$row->institute,
 				$year
 			);
 			$i--;
