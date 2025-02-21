@@ -70,6 +70,7 @@ function generate_pdf()
 	$pdf->Cell(0, 10, $data3->name_title . '. ' . $data3->contributor_name, '0', '1', 'C');
 	$pdf->Ln(0);
 	$pdf->SetFont('Times', 'I', 18);
+
 	// $university=SetTextColor(37, 22, 247);
 	if (strtolower($data3->branch) != "others") {
 		$title = WordWrap($data3->project_title,60);
