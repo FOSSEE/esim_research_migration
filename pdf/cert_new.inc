@@ -73,10 +73,10 @@ function generate_pdf()
 	// $university=SetTextColor(37, 22, 247);
 	if (strtolower($data3->branch) != "others") {
 		$title = WordWrap($data3->project_title,60);
-		$university = 'from ' . $data3->university;
+		$institute = 'from ' . $data3->institute;
 		$pdf->SetTextColor(0, 0, 0);
-		//$pdf->Cell(240, 8, 'from ' . $data3->university . ' has successfully', '0', '1', 'C');
-		$pdf->MultiCell(0, 10, $university, '0','C');
+		//$pdf->Cell(240, 8, 'from ' . $data3->institute . ' has successfully', '0', '1', 'C');
+		$pdf->MultiCell(0, 10, $institute, '0','C');
 		$pdf->Ln(0);
 		$pdf->Cell(0, 10, 'has successfully completed the Research Migration of', '0', '1', 'C');		
 		$pdf->Ln(0);
@@ -114,7 +114,7 @@ function generate_pdf()
 	} //strtolower($data3->branch) != "others"
 	else {
 		$pdf->SetTextColor(0, 0, 0);
-		$pdf->Cell(240, 8, 'from ' . $data3->university . ' college', '0', '1', 'C');
+		$pdf->Cell(240, 8, 'from ' . $data3->institute . ' college', '0', '1', 'C');
 		$pdf->Ln(0);
 		$pdf->Cell(240, 8, 'has successfully completed the Research Migration of', '0', '1', 'C');
 		$pdf->Ln(0);
