@@ -23,15 +23,15 @@ research_migration_solution : approval_status
 */
 function esim_research_migration_proposal_form($form, &$form_state, $no_js_use = FALSE)
 {
-	global $user;
+	$user = \Drupal::currentUser();
 	/************************ start approve book details ************************/
 	if ($user->uid == 0)
 	{
-		$msg = drupal_set_message(t('It is mandatory to ' . l('login', 'user') . ' on this website to access the Research Migration proposal form. If you are new user please create a new account first.'), 'error');
+		$msg = \Drupal::messenger()->addError(t('It is mandatory to ' . \Drupal\Core\Link::fromTextAndUrl('login', \Drupal\Core\Url::fromRoute('user.page')) . ' on this website to access the Research Migration proposal form. If you are new user please create a new account first.'));
 		drupal_goto('user/login', array('query' => drupal_get_destination()));
 		return $msg;
 	} //$user->uid == 0
-	$query = db_select('research_migration_proposal');
+	$query = \Drupal::database()->select('research_migration_proposal');
 	$query->fields('research_migration_proposal');
 	$query->condition('uid', $user->uid);
 	$query->orderBy('id', 'DESC');
@@ -42,7 +42,7 @@ function esim_research_migration_proposal_form($form, &$form_state, $no_js_use =
 	{
 		if ($proposal_data->approval_status == 0 || $proposal_data->approval_status == 1)
 		{
-			drupal_set_message(t('We have already received your proposal.'), 'status');
+			\Drupal::messenger()->addStatus(t('We have already received your proposal.'));
 			drupal_goto('');
 			return;
 		} //$proposal_data->approval_status == 0 || $proposal_data->approval_status == 1
@@ -275,11 +275,16 @@ function esim_research_migration_proposal_form($form, &$form_state, $no_js_use =
 		'#collapsible' => FALSE,
 		'#collapsed' => FALSE
 	);
-	$form['samplefile']['samplefile_path'] = array(
-		'#type' => 'file',
-		'#size' => 48,
-		'#description' => t('<span style="color:red;">Upload filenames with allowed extensions only. No spaces or any special characters allowed in filename.</span>') . '<br />' . t('<span style="color:red;">Allowed file extensions : ') . variable_get('resource_upload_extensions', '') . '</span>'
-	);
+	// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $form['samplefile']['samplefile_path'] = array(
+// 		'#type' => 'file',
+// 		'#size' => 48,
+// 		'#description' => t('<span style="color:red;">Upload filenames with allowed extensions only. No spaces or any special characters allowed in filename.</span>') . '<br />' . t('<span style="color:red;">Allowed file extensions : ') . variable_get('resource_upload_extensions', '') . '</span>'
+// 	);
+
 	$form['date_of_proposal'] = array(
 		'#type' => 'date_popup',
 		'#title' => t('Date of Proposal'),
@@ -418,7 +423,12 @@ if (isset($_FILES['files']))
 			if ($file_name)
 			{
 				/* checking file type */
-				$allowed_extensions_str = variable_get('resource_upload_extensions', '');
+				// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $allowed_extensions_str = variable_get('resource_upload_extensions', '');
+
 				$allowed_extensions = explode(',', $allowed_extensions_str);
 				$fnames = explode('.', strtolower($_FILES['files']['name'][$file_form_name]));
 				$temp_extension = end($fnames);
@@ -436,11 +446,11 @@ if (isset($_FILES['files']))
 }
 function esim_research_migration_proposal_form_submit($form, &$form_state)
 {
-	global $user;
+	$user = \Drupal::currentUser();
 	$root_path = research_migration_path();
 	if (!$user->uid)
 	{
-		drupal_set_message('It is mandatory to login on this website to access the proposal form', 'error');
+		\Drupal::messenger()->addError('It is mandatory to login on this website to access the proposal form');
 		return;
 	}
 	
@@ -542,9 +552,7 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
 		":approval_date" => 0,
 		":samplefilepath" => "",
 		);
-	$result1 = db_query($result, $args, array(
-		'return' => Database::RETURN_INSERT_ID
-	));
+	$result1 = \Drupal::database()->query($result, $args, $result);
 	//var_dump($result1->id);die;
 	// $query_pro = db_select('research_migration_proposal');
 	// $query_pro->fields('research_migration_proposal');
@@ -564,7 +572,7 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
 			//$file_type = 'S';
 			if (file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name]))
 			{
-				 drupal_set_message(t("Error uploading file. File !filename already exists.", array('!filename' => $_FILES['files']['name'][$file_form_name])), 'error');
+				 \Drupal::messenger()->addError(t("Error uploading file. File !filename already exists.", array('!filename' => $_FILES['files']['name'][$file_form_name])));
 				//unlink($root_path . $dest_path . $_FILES['files']['name'][$file_form_name]);
 			} //file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
 			/* uploading file */
@@ -576,27 +584,42 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
 					":id" => $result1
 				);
 				
-				$updateresult = db_query($query, $args);
+				$updateresult = \Drupal::database()->query($query, $args);
 				//var_dump($args);die;
 
-				drupal_set_message($file_name . ' uploaded successfully.', 'status');
+				\Drupal::messenger()->addStatus($file_name . ' uploaded successfully.');
 			} //move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
 			else
 			{
-				drupal_set_message('Error uploading file : ' . $dest_path . '/' . $file_name, 'error');
+				\Drupal::messenger()->addError('Error uploading file : ' . $dest_path . '/' . $file_name);
 			}
 		} //$file_name
 	} //$_FILES['files']['name'] as $file_form_name => $file_name
 	if (!$result1)
 	{
-		drupal_set_message(t('Error receiving your proposal. Please try again.'), 'error');
+		\Drupal::messenger()->addError(t('Error receiving your proposal. Please try again.'));
 		return;
 	} //!$proposal_id
 	/* sending email */
 	$email_to = $user->mail;
-	$form = variable_get('research_migration_from_email', '');
-	$bcc = variable_get('research_migration_emails', '');
-	$cc = variable_get('research_migration_cc_emails', '');
+	// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $form = variable_get('research_migration_from_email', '');
+
+	// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $bcc = variable_get('research_migration_emails', '');
+
+	// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $cc = variable_get('research_migration_cc_emails', '');
+
 	$params['research_migration_proposal_received']['result1'] = $result1;
 	$params['research_migration_proposal_received']['user_id'] = $user->uid;
 	$params['research_migration_proposal_received']['headers'] = array(
@@ -609,8 +632,8 @@ function esim_research_migration_proposal_form_submit($form, &$form_state)
 		'Bcc' => $bcc
 	);
 	if (!drupal_mail('research_migration', 'research_migration_proposal_received', $email_to, user_preferred_language($user), $params, $form, TRUE))
-		drupal_set_message('Error sending email message.', 'error');
-	drupal_set_message(t('We have received your Research Migration proposal. We will get back to you soon.'), 'status');
+		\Drupal::messenger()->addError('Error sending email message.');
+	\Drupal::messenger()->addStatus(t('We have received your Research Migration proposal. We will get back to you soon.'));
 	drupal_goto('');
 }
 

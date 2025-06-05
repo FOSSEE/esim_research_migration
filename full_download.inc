@@ -2,11 +2,11 @@
 // $Id$
 function esim_research_migration_download_full_project()
 {
-	global $user;
+	$user = \Drupal::currentUser();
 	$id = arg(3);
 	$root_path = esim_research_migration_path();
 	//var_dump($root_path);die;
-	$query = db_select('research_migration_proposal');
+	$query = \Drupal::database()->select('research_migration_proposal');
 	$query->fields('research_migration_proposal');
 	$query->condition('id', $id);
 	$research_migration_q = $query->execute();
@@ -17,14 +17,14 @@ function esim_research_migration_download_full_project()
 	/* creating zip archive on the server */
 	$zip = new ZipArchive();
 	$zip->open($zip_filename, ZipArchive::CREATE);
-	$query = db_select('research_migration_proposal');
+	$query = \Drupal::database()->select('research_migration_proposal');
 	$query->fields('research_migration_proposal');
 	$query->condition('id', $id);
 	$circuit_simulation_udc_q = $query->execute();
-	$query = db_select('research_migration_proposal');
+	$query = \Drupal::database()->select('research_migration_proposal');
 	$query->fields('research_migration_proposal');
 	$query->condition('id', $id);
-	$query = db_select('research_migration_submitted_abstracts_file');
+	$query = \Drupal::database()->select('research_migration_submitted_abstracts_file');
 	$query->fields('research_migration_submitted_abstracts_file');
 	$query->condition('proposal_id', $id);
 	$project_files = $query->execute();
@@ -60,14 +60,14 @@ function esim_research_migration_download_full_project()
 		}
 	} //$zip_file_count > 0
 	else {
-		drupal_set_message("There are no research migration project in this proposal to download", 'error');
+		\Drupal::messenger()->addError("There are no research migration project in this proposal to download");
 		drupal_goto('research-migration-project/full-download/project');
 	}
 }
 /*
 function circuit_simulation_download_completed_project()
 {
-		global $user;
+		$user = \Drupal::currentUser();
 	$id = arg(3);
 	$root_path = esim_research_migration_path();
 	$query = db_select('research_migration_proposal');

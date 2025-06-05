@@ -8,7 +8,7 @@ function esim_research_migration_project_files() {
 	// $query->condition('filetype', 'A');
 	// $result = $query->execute();
 	// $esim_research_migration_project_files = $result->fetchObject();
-	$query1 = db_select('research_migration_proposal');
+	$query1 = \Drupal::database()->select('research_migration_proposal');
 	$query1->fields('research_migration_proposal');
 	$query1->condition('id', $proposal_id);
 	$result1 = $query1->execute();

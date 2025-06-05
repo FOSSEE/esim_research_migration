@@ -42,10 +42,13 @@ function esim_research_migration_run_form($form, &$form_state)
 			'#type' => 'item',
 			'#markup' => '<div id="ajax_research_migration_details">' . _research_migration_details($research_migration_default_value) . '</div>'
 		);
-		$form['selected_research_migration'] = array(
-			'#type' => 'item',
-			'#markup' => '<div id="ajax_selected_research_migration">' . l('Download Synopsis', "research-migration-project/download/project-file/" . $research_migration_default_value) . '<br>' . l('Download research migration', 'research-migration-project/full-download/project/' . $research_migration_default_value) . '</div>'
-		);
+		// @FIXME
+// l() expects a Url object, created from a route name or external URI.
+// $form['selected_research_migration'] = array(
+// 			'#type' => 'item',
+// 			'#markup' => '<div id="ajax_selected_research_migration">' . l('Download Synopsis', "research-migration-project/download/project-file/" . $research_migration_default_value) . '<br>' . l('Download research migration', 'research-migration-project/full-download/project/' . $research_migration_default_value) . '</div>'
+// 		);
+
 	}
 	return $form;
 }
@@ -56,9 +59,12 @@ function research_migration_project_details_callback($form, $form_state)
 	if ($research_migration_default_value != 0) {
 		$form['research_migration_details']['#markup'] = _research_migration_details($research_migration_default_value);
 		$research_migration_details = _research_migration_information($research_migration_default_value);
-		$provider = user_load($research_migration_details->uid);
+		$provider = \Drupal::entityTypeManager()->getStorage('user')->load($research_migration_details->uid);
 		if ($research_migration_details->uid > 0) {
-			$commands[] = ajax_command_html('#ajax_selected_research_migration', l('Download Synopsis', "research-migration-project/download/project-file/" . $research_migration_default_value) . '<br>' . l('Download research migration', 'research-migration-project/full-download/project/' . $research_migration_default_value));
+			// @FIXME
+// l() expects a Url object, created from a route name or external URI.
+// $commands[] = ajax_command_html('#ajax_selected_research_migration', l('Download Synopsis', "research-migration-project/download/project-file/" . $research_migration_default_value) . '<br>' . l('Download research migration', 'research-migration-project/full-download/project/' . $research_migration_default_value));
+
 		} //$research_migration_details->uid > 0
 		else {
 			$commands[] = ajax_command_html('#ajax_selected_research_migration', '');
@@ -108,7 +114,7 @@ function _list_of_research_migration()
 		'0' => 'Please select...'
 	);
 	//$lab_titles_q = db_query("SELECT * FROM {research_migration_proposal} WHERE solution_display = 1 ORDER BY lab_title ASC");
-	$query = db_select('research_migration_proposal');
+	$query = \Drupal::database()->select('research_migration_proposal');
 	$query->fields('research_migration_proposal');
 	$query->condition('approval_status', 3);
 	$query->orderBy('project_title', 'ASC');
@@ -120,7 +126,7 @@ function _list_of_research_migration()
 }
 function _research_migration_information($proposal_id)
 {
-	$query = db_select('research_migration_proposal');
+	$query = \Drupal::database()->select('research_migration_proposal');
 	$query->fields('research_migration_proposal');
 	$query->condition('id', $proposal_id);
 	$query->condition('approval_status', 3);
