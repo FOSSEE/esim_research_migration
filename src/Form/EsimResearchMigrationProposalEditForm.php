@@ -23,7 +23,9 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
     $user = \Drupal::currentUser();
     /* get current proposal */
-    $proposal_id = (int) arg(3);
+    // $proposal_id = (int) arg(3);
+    $proposal_id = (int) \Drupal::routeMatch()->getParameter('proposal_id');
+
     //$proposal_q = db_query("SELECT * FROM {research_migration_proposal} WHERE id = %d", $proposal_id);
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');

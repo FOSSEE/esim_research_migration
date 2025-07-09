@@ -7,6 +7,7 @@
 
 namespace Drupal\esim_research_migration\Form;
 
+
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
@@ -20,6 +21,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Mail\MailManager;
+use Drupal\user\Entity\User;
 
 
 class EsimResearchMigrationProposalForm extends FormBase {
@@ -32,16 +34,29 @@ class EsimResearchMigrationProposalForm extends FormBase {
   }
 
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state, $no_js_use = NULL) {
-    $user = \Drupal::currentUser();
+     $user = \Drupal::currentUser();
     /************************ start approve book details ************************/
-    if ($user->id() == 0) {
-      $msg = \Drupal::messenger()->addError(t('It is mandatory to ' . \Drupal\Core\Link::fromTextAndUrl('login', \Drupal\Core\Url::fromRoute('user.page')) . ' on this website to access the Research Migration proposal form. If you are new user please create a new account first.'));
-      drupal_goto('user/login', ['query' => drupal_get_destination()]);
+    
+     if ($user->id() == 0) {
+      $msg = \Drupal::messenger()->addError(t('It is mandatory to @login_link on this website to access the Research Migration proposal form. If you are new user please create a new account first.', [
+        '@login_link' => Link::fromTextAndUrl(t('login'), Url::fromRoute('user.page'))->toString(),
+      ]));
+      // $msg = \Drupal::messenger()->addError(t('It is mandatory to ' . \Drupal\Core\Link::fromTextAndUrl('login', \Drupal\Core\Url::fromRoute('user.page')) . ' on this website to access the flowsheet proposal form. If you are new user please create a new account first.'));
+      //drupal_goto('dwsim-flowsheet-project');
+      $response = new RedirectResponse(Url::fromRoute('user.login', [], [
+        'query' => \Drupal::destination()->getAsArray(),
+      ])->toString());
+      
+      return $response;
+      // drupal_goto('user/login', [
+      //   'query' => drupal_get_destination()
+      //   ]);
       return $msg;
     } //$user->uid == 0
+
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
-    $query->condition('uid', $user->uid);
+    $query->condition('uid', 1);
     $query->orderBy('id', 'DESC');
     $query->range(0, 1);
     $proposal_q = $query->execute();
@@ -49,10 +64,17 @@ class EsimResearchMigrationProposalForm extends FormBase {
     if ($proposal_data) {
       if ($proposal_data->approval_status == 0 || $proposal_data->approval_status == 1) {
         \Drupal::messenger()->addStatus(t('We have already received your proposal.'));
-        drupal_goto('');
-        return;
+         $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
+  
+  // Send the redirect response
+//  $response->send();
+        // drupal_goto('');
+      
+        return $response;
+        
       } //$proposal_data->approval_status == 0 || $proposal_data->approval_status == 1
     } //$proposal_data
+    // var_dump($proposal_q);die;
     $form['#attributes'] = [
       'enctype' => "multipart/form-data"
       ];
@@ -281,15 +303,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
       '#collapsible' => FALSE,
       '#collapsed' => FALSE,
     ];
-    // @FIXME
-    // // @FIXME
-    // // This looks like another module's variable. You'll need to rewrite this call
-    // // to ensure that it uses the correct configuration object.
-    // $form['samplefile']['samplefile_path'] = array(
-    // 		'#type' => 'file',
-    // 		'#size' => 48,
-    // 		'#description' => t('<span style="color:red;">Upload filenames with allowed extensions only. No spaces or any special characters allowed in filename.</span>') . '<br />' . t('<span style="color:red;">Allowed file extensions : ') . variable_get('resource_upload_extensions', '') . '</span>'
-    // 	);
+   
 
     $form['samplefile']['samplefile_path'] = [
         '#type' => 'file',
@@ -461,7 +475,7 @@ $allowed_extensions_str = \Drupal::config('esim_research_migration.settings')->g
     return $_SERVER['DOCUMENT_ROOT'] . base_path() . 'esim_uploads/research_migration_uploads/';
   }
   public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
+  $user = \Drupal\user\Entity\User::load(\Drupal::currentUser()->id());
     $root_path = $this->research_migration_path();
     if (!$user->id()) {
       \Drupal::messenger()->addError('It is mandatory to login on this website to access the proposal form');
@@ -539,7 +553,7 @@ $allowed_extensions_str = \Drupal::config('esim_research_migration.settings')->g
 	:samplefilepath
     )";
     $args = [
-      ":uid" => $user->uid,
+      ":uid" => $user->get('uid')->value,
       ":approver_uid" => 0,
       ":name_title" => $v['name_title'],
       ":contributor_name" => $this->_df_sentence_case(trim($v['contributor_name'])),
@@ -565,7 +579,9 @@ $allowed_extensions_str = \Drupal::config('esim_research_migration.settings')->g
       ":approval_date" => 0,
       ":samplefilepath" => "",
     ];
-    $result1 = \Drupal::database()->query($result, $args);
+    $connection = Database::getConnection();
+$result1 = $connection->insert('research_migration_proposal')->fields($args)->execute();
+    // $result1 = \Drupal::database()->query($result, $args)->execute();
     //var_dump($result1->id);die;
     // $query_pro = db_select('research_migration_proposal');
     // $query_pro->fields('research_migration_proposal');
@@ -612,6 +628,7 @@ $allowed_extensions_str = \Drupal::config('esim_research_migration.settings')->g
     } //!$proposal_id
 	/* sending email */
     // Fetch configuration values using the Configuration API.
+     $email_to = $user->getMail();
 $config = \Drupal::config('research_migration.settings');
 
 // Get the "from" email address from the configuration.
@@ -635,15 +652,19 @@ $cc = $config->get('research_migration_cc_emails');
       'Cc' => $cc,
       'Bcc' => $bcc,
     ];
-    if (!drupal_mail('research_migration', 'research_migration_proposal_received', $email_to, user_preferred_language($user), $params, $form, TRUE)) {
-      \Drupal::messenger()->addError('Error sending email message.');
-    }
+    // if (!drupal_mail('research_migration', 'research_migration_proposal_received', $email_to, user_preferred_language($user), $params, $form, TRUE)) {
+    //   \Drupal::messenger()->addError('Error sending email message.');
+    // }
     // Sending the email using Drupal's mail manager service
 if (!\Drupal::service('plugin.manager.mail')->$this->research_migration_mail('research_migration', 'research_migration_proposal_received', $email_to, 'en', $params, $form, TRUE)) {
   \Drupal::messenger()->addError('Error sending email message.');
 }
+ $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
+    // Send the redirect response
+    $response->send();
+    
     \Drupal::messenger()->addStatus(t('We have received your Research Migration proposal. We will get back to you soon.'));
-    drupal_goto('');
+ 
   }
 
   public function _df_sentence_case($string)

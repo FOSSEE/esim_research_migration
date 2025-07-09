@@ -10,6 +10,8 @@ namespace Drupal\esim_research_migration\Form;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Drupal\Core\Url;
 
 class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
 
@@ -25,7 +27,7 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
     $form['#attributes'] = ['enctype' => "multipart/form-data"];
     /* get current proposal */
     //$proposal_id = (int) arg(3);
-    $uid = $user->uid;
+    $uid = $user->id();
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
     $query->condition('uid', $uid);
@@ -37,13 +39,15 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
       } //$proposal_data = $proposal_q->fetchObject()
       else {
         \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-        drupal_goto('research-migration-project/abstract-code');
+       $response = new RedirectResponse(Url::fromUserInput('/research-migration-project/abstract-code')->toString());
+$response->send();
         return;
       }
     } //$proposal_q
     else {
       \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-      drupal_goto('research-migration-project/abstract-code');
+      $response = new RedirectResponse(Url::fromUserInput('/research-migration-project/abstract-code')->toString());
+$response->send();
       return;
     }
     $query = \Drupal::database()->select('research_migration_submitted_abstracts');
@@ -53,7 +57,8 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
     if ($abstracts_q) {
       if ($abstracts_q->is_submitted == 1) {
         \Drupal::messenger()->addError(t('You have already submited your Case Directory, hence you can not upload any more, for any query please write to us.'));
-        drupal_goto('research-migration-project/abstract-code');
+       $response = new RedirectResponse(Url::fromUserInput('/research-migration-project/abstract-code')->toString());
+$response->send();
         //return;
       } //$abstracts_q->is_submitted == 1
     } //$abstracts_q->is_submitted == 1
@@ -202,7 +207,9 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
     $proposal_data = esim_research_migration_get_proposal();
     $proposal_id = $proposal_data->id;
     if (!$proposal_data) {
-      drupal_goto('');
+      $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
+      // Send the redirect response
+      $response->send();
       return;
     } //!$proposal_data
     $proposal_id = $proposal_data->id;
@@ -388,7 +395,8 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
       \Drupal::messenger()->addError('Error sending email message.');
     }
 
-    drupal_goto('research-migration-project/abstract-code');
+    $response = new RedirectResponse(Url::fromUserInput('/research-migration-project/abstract-code')->toString());
+$response->send();
   }
 
 }

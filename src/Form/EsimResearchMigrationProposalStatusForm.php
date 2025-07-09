@@ -10,6 +10,13 @@ namespace Drupal\esim_research_migration\Form;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
+use Drupal\Core\Routing\TrustedRedirectResponse;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Drupal\Core\Link;
+use Drupal\Core\Url;
+use Drupal\user\Entity\User;
+use Drupal\Core\Render\Markup;
 
 class EsimResearchMigrationProposalStatusForm extends FormBase {
 
@@ -23,7 +30,8 @@ class EsimResearchMigrationProposalStatusForm extends FormBase {
   public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
     $user = \Drupal::currentUser();
     /* get current proposal */
-    $proposal_id = (int) arg(3);
+     $proposal_id  = (int) \Drupal::routeMatch('esim_research_migration.proposal_status_form')->getParameter('id');
+    // $proposal_id = (int) arg(3);
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
     $query->condition('id', $proposal_id);
@@ -327,4 +335,8 @@ class EsimResearchMigrationProposalStatusForm extends FormBase {
   }
 
 }
+
+
+
+
 ?>

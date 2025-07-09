@@ -1,4 +1,20 @@
 <?php
+
+use Drupal\Core\Form\FormBase;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Controller\ControllerBase;
+use Drupal\Core\Link;
+use Drupal\Core\Url;
+use Symfony\Component\HttpFoundation\Response;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Database\Database;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Drupal\Core\File\FileSystemInterface;
+use Drupal\Service;
+use Drupal\user\Entity\User;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Form\FormBuilderInterface;
+use Drupal\Core\Render\Markup;
 // $Id$
 error_reporting(E_ALL);
 ini_set('display_errors', TRUE);
@@ -529,7 +545,9 @@ function esim_research_migration_get_proposal()
     $proposal_data = $proposal_q->fetchObject();
     if (!$proposal_data) {
         \Drupal::messenger()->addError("You do not have any approved  Research Migration proposal. Please propose a Research Migration");
-        drupal_goto('');
+       $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
+      // Send the redirect response
+      $response->send();
     } //!$proposal_data
     switch ($proposal_data->approval_status) {
         case 0:

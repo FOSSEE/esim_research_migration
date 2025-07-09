@@ -41,7 +41,7 @@ esim_research_migration.proposal_approval_form:
   requirements:
     _permission: 'Research Migration manage proposal'
 esim_research_migration.proposal_edit_form:
-  path: /research-migration-project/manage-proposal/edit
+  path: /research-migration-project/manage-proposal/edit/{proposal_id}
   defaults:
     _title: 'Edit Proposal'
     _form: \Drupal\esim_research_migration\Form\EsimResearchMigrationProposalEditForm

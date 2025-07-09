@@ -10,6 +10,13 @@ namespace Drupal\esim_research_migration\Form;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
+use Drupal\Core\Ajax\AjaxResponse;
+use Drupal\Core\Ajax\HtmlCommand;
+use Drupal\Core\Ajax\ReplaceCommand;
+use Drupal\Core\Url;
+use Drupal\Core\Link;
+use Drupal\Core\Render\Markup;
+
 
 class EsimResearchMigrationAbstractBulkApprovalForm extends FormBase {
 
@@ -20,70 +27,92 @@ class EsimResearchMigrationAbstractBulkApprovalForm extends FormBase {
     return 'esim_research_migration_abstract_bulk_approval_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $options_first = _bulk_list_of_research_migration_project();
-    $selected = !$form_state->getValue(['research_migration_project']) ? $form_state->getValue([
-      'research_migration_project'
-      ]) : key($options_first);
-    $form = [];
-    $form['research_migration_project'] = [
-      '#type' => 'select',
-      '#title' => t('Title of the Research Migration project'),
-      '#options' => _bulk_list_of_research_migration_project(),
-      '#default_value' => $selected,
-      '#ajax' => [
-        'callback' => 'ajax_bulk_research_migration_abstract_details_callback'
+
+
+public function buildForm(array $form, FormStateInterface $form_state) {
+  $options_first = _bulk_list_of_research_migration_project();
+  $selected = $form_state->getValue('research_migration_project') ?? key($options_first);
+
+  $form['research_migration_project'] = [
+    '#type' => 'select',
+    '#title' => $this->t('Title of the Research Migration project'),
+    '#options' => $options_first,
+    '#default_value' => $selected,
+    '#ajax' => [
+      'callback' => [$this, 'ajaxBulkResearchMigrationAbstractDetailsCallback'],
+      'event' => 'change',
+      'wrapper' => 'ajax_selected_research_migration_wrapper',
+    ],
+    '#suffix' => '<div id="ajax_selected_research_migration_wrapper"><div id="ajax_selected_research_migration"></div><div id="ajax_selected_research_migration_pdf"></div></div>',
+  ];
+// var_dump(_research_migration_details(10));die;
+  $form['research_migration_actions'] = [
+    '#type' => 'select',
+    '#title' => $this->t('Please select action for Research Migration project'),
+    '#options' => _bulk_list_research_migration_actions(),
+    '#default_value' => 0,
+    '#prefix' => '<div id="ajax_selected_research_migration_action" style="color:red;">',
+    '#suffix' => '</div>',
+    '#states' => [
+      'invisible' => [
+        ':input[name="research_migration_project"]' => ['value' => 0],
+      ],
+    ],
+  ];
+
+  $form['message'] = [
+    '#type' => 'textarea',
+    '#title' => $this->t('If Dis-Approved please specify reason for Dis-Approval'),
+    '#prefix' => '<div id="message_submit">',
+    '#states' => [
+      'visible' => [
+        [
+          ':input[name="research_migration_actions"]' => ['value' => 2],
         ],
-      '#suffix' => '<div id="ajax_selected_research_migration"></div><div id="ajax_selected_research_migration_pdf"></div>',
-    ];
-    $form['research_migration_actions'] = [
-      '#type' => 'select',
-      '#title' => t('Please select action for Research Migration project'),
-      '#options' => _bulk_list_research_migration_actions(),
-      '#default_value' => 0,
-      '#prefix' => '<div id="ajax_selected_research_migration_action" style="color:red;">',
-      '#suffix' => '</div>',
-      '#states' => [
-        'invisible' => [
-          ':input[name="research_migration_project"]' => [
-            'value' => 0
-            ]
-          ]
+        'or',
+        [
+          ':input[name="research_migration_actions"]' => ['value' => 3],
         ],
-    ];
-    $form['message'] = [
-      '#type' => 'textarea',
-      '#title' => t('If Dis-Approved please specify reason for Dis-Approval'),
-      '#prefix' => '<div id= "message_submit">',
-      '#states' => [
-        'visible' => [
-          [
-            ':input[name="research_migration_actions"]' => [
-              'value' => 2
-              ]
-            ],
-          'or',
-          [
-            ':input[name="research_migration_actions"]' => [
-              'value' => 3
-              ]
-            ],
-        ]
-        ],
-    ];
-    $form['submit'] = [
-      '#type' => 'submit',
-      '#value' => t('Submit'),
-      '#states' => [
-        'invisible' => [
-          ':input[name="lab"]' => [
-            'value' => 0
-            ]
-          ]
-        ],
-    ];
-    return $form;
+      ],
+    ],
+  ];
+
+  $form['submit'] = [
+    '#type' => 'submit',
+    '#value' => $this->t('Submit'),
+    '#states' => [
+      'visible' => [
+        ':input[name="research_migration_actions"]' => ['!value' => 0],
+      ],
+    ],
+  ];
+
+  return $form;
+}
+
+/**
+ * AJAX callback for project selection.
+ */
+public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, FormStateInterface $form_state) {
+  $response = new AjaxResponse();
+  $selected_project = $form_state->getValue('research_migration_project');
+
+  if ($selected_project != 0) {
+    $details_markup = _research_migration_details($selected_project);
+
+    $response->addCommand(new HtmlCommand('#ajax_selected_research_migration', $details_markup));
+
+    // Refresh the options in the second select box
+    $form['research_migration_actions']['#options'] = _bulk_list_research_migration_actions();
+    $rendered_actions = \Drupal::service('renderer')->render($form['research_migration_actions']);
+    $response->addCommand(new ReplaceCommand('#ajax_selected_research_migration_action', $rendered_actions));
   }
+  else {
+    $response->addCommand(new HtmlCommand('#ajax_selected_research_migration', ''));
+  }
+
+  return $response;
+}
 
   public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
     $user = \Drupal::currentUser();
@@ -367,5 +396,92 @@ class EsimResearchMigrationAbstractBulkApprovalForm extends FormBase {
     } //$form_state['clicked_button']['#value'] == 'Submit'
   }
 
+}
+
+
+/*************************************************************************** */
+function _research_migration_details($research_migration_proposal_id): array {
+  $proposal = \Drupal::database()->select('research_migration_proposal', 'p')
+    ->fields('p')
+    ->condition('id', $research_migration_proposal_id)
+    ->execute()
+    ->fetchObject();
+
+  if (!$proposal) {
+    return ['#markup' => t('Proposal not found.')];
+  }
+
+  // Abstract file (type A)
+  $abstract_file = \Drupal::database()->select('research_migration_submitted_abstracts_file', 'f')
+    ->fields('f')
+    ->condition('proposal_id', $research_migration_proposal_id)
+    ->condition('filetype', 'A')
+    ->execute()
+    ->fetchObject();
+
+  $abstract_filename = (!empty($abstract_file->filename)) ? $abstract_file->filename : 'File not uploaded';
+
+  // Case Directory file (type S)
+  $case_dir_file = \Drupal::database()->select('research_migration_submitted_abstracts_file', 'f')
+    ->fields('f')
+    ->condition('proposal_id', $research_migration_proposal_id)
+    ->condition('filetype', 'S')
+    ->execute()
+    ->fetchObject();
+
+  $case_dir_filename = (!empty($case_dir_file->filename)) ? $case_dir_file->filename : 'File not uploaded';
+
+  // Optional abstract submission check
+  $abstracts_q = \Drupal::database()->select('research_migration_submitted_abstracts', 'a')
+    ->fields('a')
+    ->condition('proposal_id', $research_migration_proposal_id)
+    ->execute()
+    ->fetchObject();
+
+  // Download project link
+  $download_link = Link::fromTextAndUrl(
+    'Download Research Migration project',
+    Url::fromUserInput('/research-migration-project/full-download/project/' . $research_migration_proposal_id)
+  )->toString();
+
+  $markup = <<<HTML
+<strong>Proposer Name:</strong><br />{$proposal->name_title} {$proposal->contributor_name}<br /><br />
+<strong>Title of the Research Migration Project:</strong><br />{$proposal->project_title}<br /><br />
+<strong>Uploaded an abstract (brief outline) of the project:</strong><br />{$abstract_filename}<br /><br />
+<strong>Uploaded Case Directory Folder:</strong><br />{$case_dir_filename}<br /><br />
+{$download_link}
+HTML;
+
+  return [
+    '#type' => 'markup',
+    '#markup' => Markup::create($markup),
+  ];
+}
+function _bulk_list_of_research_migration_project() {
+  $project_titles = [
+    '0' => 'Please select...'
+  ];
+
+  $query = \Drupal::database()->select('research_migration_proposal', 'r');
+  $query->fields('r');
+  $query->condition('is_submitted', 1);
+  $query->condition('approval_status', 1);
+  $query->orderBy('project_title', 'ASC');
+
+  $results = $query->execute();
+  foreach ($results as $row) {
+    $project_titles[$row->id] = $row->project_title . ' (Proposed by ' . $row->contributor_name . ')';
+  }
+
+  return $project_titles;
+}
+function _bulk_list_research_migration_actions(): array {
+  return [
+    0 => 'Please select...',
+    1 => 'Approve Entire Research Migration Project',
+    2 => 'Resubmit Project files',
+    3 => 'Dis-Approve Entire Research Migration Project (This will delete Research Migration Project)',
+    // 4 => 'Delete Entire Research Migration Project Including Proposal', // if needed
+  ];
 }
 ?>
