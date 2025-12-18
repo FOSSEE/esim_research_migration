@@ -9,7 +9,8 @@ namespace Drupal\esim_research_migration\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
+use Drupal\Core\Url;
+use Drupal\Core\Link;
 
 class EsimResearchMigrationProposalEditForm extends FormBase {
 
@@ -20,18 +21,23 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
     return 'esim_research_migration_proposal_edit_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    // $proposal_id = (int) arg(3);
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $proposal_id = (int) \Drupal::routeMatch()->getParameter('proposal_id');
+    if ($proposal_id <= 0) {
+      $this->messenger()->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
+      return [];
+    }
 
-    //$proposal_q = db_query("SELECT * FROM {research_migration_proposal} WHERE id = %d", $proposal_id);
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
     $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    $proposal_data = $proposal_q->fetchObject();
+    $proposal_data = $query->execute()->fetchObject();
+    if (!$proposal_data) {
+      $this->messenger()->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
+      return [];
+    }
     /*if ($proposal_q) {
         if ($proposal_data = $proposal_q->fetchObject()) {
             /* everything ok 
@@ -71,7 +77,7 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
     $form['student_email_id'] = [
       '#type' => 'item',
       '#title' => t('Email'),
-      '#markup' => $user_data->mail,
+    '#markup' => $user_data ? $user_data->getEmail() : '',
     ];
     $form['university'] = [
       '#type' => 'textfield',
@@ -156,61 +162,45 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
       '#type' => 'submit',
       '#value' => t('Submit'),
     ];
-    // @FIXME
-    // l() expects a Url object, created from a route name or external URI.
-    // $form['cancel'] = array(
-    //         '#type' => 'item',
-    //         '#markup' => l(t('Cancel'), 'research-migration-project/manage-proposal'),
-    //     );
+    $form['cancel'] = [
+      '#type' => 'item',
+      '#markup' => Link::fromTextAndUrl($this->t('Cancel'), Url::fromRoute('esim_research_migration.proposal_pending'))->toString(),
+    ];
 
     return $form;
   }
 
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    $proposal_id = (int) arg(3);
-    $query = \Drupal::database()->select('research_migration_proposal');
-    $query->fields('research_migration_proposal');
-    $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      } //$proposal_data = $proposal_q->fetchObject()
-      else {
-        \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-        drupal_goto('research-migration-project/manage-proposal');
-        return;
-      }
-    } //$proposal_q
-    else {
-      \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-      drupal_goto('research-migration-project/manage-proposal');
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $user = $this->currentUser();
+    $proposal_id = (int) \Drupal::routeMatch()->getParameter('proposal_id');
+    if (!$proposal_id) {
+      $this->messenger()->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
       return;
     }
-    /* delete proposal */
-    if ($form_state->getValue(['delete_proposal']) == 1) {
-      /* sending email */
-      $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid);
-      $email_to = $user_data->mail;
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $from = variable_get('research_migration_from_email', '');
 
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $bcc = variable_get('research_migration_emails', '');
+    $connection = \Drupal::database();
+    $query = $connection->select('research_migration_proposal');
+    $query->fields('research_migration_proposal');
+    $query->condition('id', $proposal_id);
+    $proposal_data = $query->execute()->fetchObject();
 
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $cc = variable_get('research_migration_cc_emails', '');
+    if (!$proposal_data) {
+      $this->messenger()->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
+      return;
+    }
+
+    if ((int) $form_state->getValue('delete_proposal') === 1) {
+      $user_storage = \Drupal::entityTypeManager()->getStorage('user');
+      /** @var \Drupal\user\UserInterface|null $user_data */
+      $user_data = $user_storage->load($proposal_data->uid);
+      $email_to = $user_data ? $user_data->getEmail() : '';
+
+      $config = \Drupal::config('esim_research_migration.settings');
+      $from = (string) $config->get('research_migration_from_email');
+      $bcc = (string) $config->get('research_migration_emails');
+      $cc = (string) $config->get('research_migration_cc_emails');
 
       $params['research_migration_proposal_deleted']['proposal_id'] = $proposal_id;
       $params['research_migration_proposal_deleted']['user_id'] = $proposal_data->uid;
@@ -223,29 +213,33 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
         'Cc' => $cc,
         'Bcc' => $bcc,
       ];
-      if (!drupal_mail('research_migration', 'research_migration_proposal_deleted', $email_to, user_preferred_language($user), $params, $from, TRUE)) {
-        \Drupal::messenger()->addError('Error sending email message.');
+
+      $mail_manager = \Drupal::service('plugin.manager.mail');
+      $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
+      $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_proposal_deleted', $email_to, $langcode, $params, $from, TRUE);
+
+      if (empty($mail_result['result'])) {
+        $this->messenger()->addError($this->t('Error sending email message.'));
       }
 
-      \Drupal::messenger()->addStatus(t('The Research Migration proposal has been deleted.'));
-      if (_rm_rrmdir_project($proposal_id) == TRUE) {
-        $query = \Drupal::database()->delete('research_migration_proposal');
-        $query->condition('id', $proposal_id);
-        $num_deleted = $query->execute();
-        \Drupal::messenger()->addStatus(t('Proposal Deleted'));
-        drupal_goto('research-migration-project/manage-proposal');
+      $this->messenger()->addStatus($this->t('The Research Migration proposal has been deleted.'));
+      if (_rm_rrmdir_project($proposal_id) === TRUE) {
+        $delete_query = $connection->delete('research_migration_proposal');
+        $delete_query->condition('id', $proposal_id);
+        $delete_query->execute();
+        $this->messenger()->addStatus($this->t('Proposal Deleted'));
+        $form_state->setRedirect('esim_research_migration.proposal_pending');
         return;
-      } //rrmdir_project($proposal_id) == TRUE
-    } //$form_state['values']['delete_proposal'] == 1
-    /* update proposal */
-    $v = $form_state->getValues();
-    $project_title = $v['project_title'];
-    $proposar_name = $v['name_title'] . ' ' . $v['contributor_name'];
-    $university = $v['university'];
+      }
+    }
+
+    $values = $form_state->getValues();
+    $project_title = $values['project_title'];
+    $proposar_name = $values['name_title'] . ' ' . $values['contributor_name'];
     $directory_names = _rm_dir_name($project_title, $proposar_name);
     if (_rm_RenameDir($proposal_id, $directory_names)) {
       $directory_name = $directory_names;
-    } //LM_RenameDir($proposal_id, $directory_names)
+    }
     else {
       return;
     }
@@ -268,23 +262,22 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
                 samplefilepath=:samplefilepath
 				WHERE id=:proposal_id";
     $args = [
-      ':name_title' => $v['name_title'],
-      ':contributor_name' => $v['contributor_name'],
-      ':university' => $v['university'],
-      ":institute" => $v['institute'],
-      ":how_did_you_know_about_project" => $v['how_did_you_know_about_project'],
-      ":faculty_name" => $v['faculty_name'],
-      ":faculty_department" => $v['faculty_department'],
-      ":faculty_email" => $v['faculty_email'],
+      ':name_title' => $values['name_title'],
+      ':contributor_name' => $values['contributor_name'],
+      ':university' => $values['university'],
+      ":institute" => $values['institute'],
+      ":how_did_you_know_about_project" => $values['how_did_you_know_about_project'],
+      ":faculty_name" => $values['faculty_name'],
+      ":faculty_department" => $values['faculty_department'],
+      ":faculty_email" => $values['faculty_email'],
       ':project_title' => $project_title,
-      ':source_of_the_project' => $v['source_of_the_project'],
+      ':source_of_the_project' => $values['source_of_the_project'],
       ':directory_name' => $directory_name,
       ':samplefilepath' => $samplefilepath,
       ':proposal_id' => $proposal_id,
     ];
-    $result = \Drupal::database()->query($query, $args);
-    \Drupal::messenger()->addStatus(t('Proposal Updated'));
+    $connection->query($query, $args);
+    $this->messenger()->addStatus($this->t('Proposal Updated'));
   }
 
 }
-?>

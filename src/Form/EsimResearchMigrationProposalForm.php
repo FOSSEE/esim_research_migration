@@ -33,46 +33,33 @@ class EsimResearchMigrationProposalForm extends FormBase {
     return 'esim_research_migration_proposal_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state, $no_js_use = NULL) {
-     $user = \Drupal::currentUser();
-    /************************ start approve book details ************************/
-    
-     if ($user->id() == 0) {
-      $msg = \Drupal::messenger()->addError(t('It is mandatory to @login_link on this website to access the Research Migration proposal form. If you are new user please create a new account first.', [
-        '@login_link' => Link::fromTextAndUrl(t('login'), Url::fromRoute('user.page'))->toString(),
+  public function buildForm(array $form, FormStateInterface $form_state, $no_js_use = NULL) {
+    $account = $this->currentUser();
+    if (!$account->isAuthenticated()) {
+      $login_link = Link::fromTextAndUrl($this->t('login'), Url::fromRoute('user.login'))->toString();
+      $this->messenger()->addError($this->t('It is mandatory to @login_link on this website to access the Research Migration proposal form. If you are a new user please create a new account first.', [
+        '@login_link' => $login_link,
       ]));
-      // $msg = \Drupal::messenger()->addError(t('It is mandatory to ' . \Drupal\Core\Link::fromTextAndUrl('login', \Drupal\Core\Url::fromRoute('user.page')) . ' on this website to access the flowsheet proposal form. If you are new user please create a new account first.'));
-      //drupal_goto('dwsim-flowsheet-project');
-      $response = new RedirectResponse(Url::fromRoute('user.login', [], [
-        'query' => \Drupal::destination()->getAsArray(),
-      ])->toString());
-      
-      return $response;
-      // drupal_goto('user/login', [
-      //   'query' => drupal_get_destination()
-      //   ]);
-      return $msg;
-    } //$user->uid == 0
+      $form_state->setRedirect('user.login', [], ['query' => \Drupal::destination()->getAsArray()]);
+      return [];
+    }
+
+    /** @var \Drupal\user\UserInterface|null $user */
+    $user = User::load($account->id());
 
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
-    $query->condition('uid', 1);
+    $query->condition('uid', $account->id());
     $query->orderBy('id', 'DESC');
     $query->range(0, 1);
     $proposal_q = $query->execute();
     $proposal_data = $proposal_q->fetchObject();
     if ($proposal_data) {
       if ($proposal_data->approval_status == 0 || $proposal_data->approval_status == 1) {
-        \Drupal::messenger()->addStatus(t('We have already received your proposal.'));
-         $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
-  
-  // Send the redirect response
-//  $response->send();
-        // drupal_goto('');
-      
-        return $response;
-        
-      } //$proposal_data->approval_status == 0 || $proposal_data->approval_status == 1
+        $this->messenger()->addStatus($this->t('We have already received your proposal.'));
+        $form_state->setRedirect('<front>');
+        return [];
+      }
     } //$proposal_data
     // var_dump($proposal_q);die;
     $form['#attributes'] = [
@@ -314,12 +301,10 @@ class EsimResearchMigrationProposalForm extends FormBase {
     ];
     
     $form['date_of_proposal'] = [
-      '#type' => 'date_popup',
+      '#type' => 'date',
       '#title' => t('Date of Proposal'),
-      '#default_value' => date("Y-m-d H:i:s"),
-      '#date_format' => 'd M Y',
+      '#default_value' => date('Y-m-d'),
       '#disabled' => TRUE,
-      '#date_label_position' => '',
     ];
     $form['expected_date_of_completion'] = [
       '#type' => 'date',
@@ -354,7 +339,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     return $form;
   }
 
-  public function validateForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  public function validateForm(array &$form, FormStateInterface $form_state) {
     //var_dump($form_state['values']['solver_used']);die;
 
     if ($form_state->getValue(['term_condition']) == '1') {
@@ -474,7 +459,7 @@ $allowed_extensions_str = \Drupal::config('esim_research_migration.settings')->g
   function research_migration_path() {
     return $_SERVER['DOCUMENT_ROOT'] . base_path() . 'esim_uploads/research_migration_uploads/';
   }
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  public function submitForm(array &$form, FormStateInterface $form_state) {
   $user = \Drupal\user\Entity\User::load(\Drupal::currentUser()->id());
     $root_path = $this->research_migration_path();
     if (!$user->id()) {
@@ -626,25 +611,17 @@ $result1 = $connection->insert('research_migration_proposal')->fields($args)->ex
       \Drupal::messenger()->addError(t('Error receiving your proposal. Please try again.'));
       return;
     } //!$proposal_id
-	/* sending email */
-    // Fetch configuration values using the Configuration API.
-     $email_to = $user->getMail();
-$config = \Drupal::config('research_migration.settings');
-
-// Get the "from" email address from the configuration.
-$form = $config->get('research_migration_from_email');
-
-// Get the BCC emails from the configuration.
-$bcc = $config->get('research_migration_emails');
-
-// Get the CC emails from the configuration.
-$cc = $config->get('research_migration_cc_emails');
-
+    /* sending email */
+    $email_to = $user->getEmail();
+    $config = \Drupal::config('esim_research_migration.settings');
+    $from = (string) ($config->get('research_migration_from_email') ?: \Drupal::config('system.site')->get('mail'));
+    $bcc = (string) $config->get('research_migration_emails');
+    $cc = (string) $config->get('research_migration_cc_emails');
 
     $params['research_migration_proposal_received']['result1'] = $result1;
     $params['research_migration_proposal_received']['user_id'] = $user->id();
     $params['research_migration_proposal_received']['headers'] = [
-      'From' => $form,
+      'From' => $from,
       'MIME-Version' => '1.0',
       'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
       'Content-Transfer-Encoding' => '8Bit',
@@ -652,18 +629,16 @@ $cc = $config->get('research_migration_cc_emails');
       'Cc' => $cc,
       'Bcc' => $bcc,
     ];
-    // if (!drupal_mail('research_migration', 'research_migration_proposal_received', $email_to, user_preferred_language($user), $params, $form, TRUE)) {
-    //   \Drupal::messenger()->addError('Error sending email message.');
-    // }
-    // Sending the email using Drupal's mail manager service
-if (!\Drupal::service('plugin.manager.mail')->$this->research_migration_mail('research_migration', 'research_migration_proposal_received', $email_to, 'en', $params, $form, TRUE)) {
-  \Drupal::messenger()->addError('Error sending email message.');
-}
- $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
-    // Send the redirect response
-    $response->send();
-    
-    \Drupal::messenger()->addStatus(t('We have received your Research Migration proposal. We will get back to you soon.'));
+
+    $mail_manager = \Drupal::service('plugin.manager.mail');
+    $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
+    $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_proposal_received', $email_to, $langcode, $params, $from, TRUE);
+    if (empty($mail_result['result'])) {
+      $this->messenger()->addError($this->t('Error sending email message.'));
+    }
+
+    $this->messenger()->addStatus($this->t('We have received your Research Migration proposal. We will get back to you soon.'));
+    $form_state->setRedirect('<front>');
  
   }
 
@@ -683,4 +658,3 @@ if (!\Drupal::service('plugin.manager.mail')->$this->research_migration_mail('re
     return $string;
   }
 }
-?>

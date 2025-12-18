@@ -9,7 +9,9 @@ namespace Drupal\esim_research_migration\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
+use Drupal\Core\Link;
+use Drupal\Core\Url;
+
 
 class EsimResearchMigrationProposalApprovalForm extends FormBase {
 
@@ -20,33 +22,27 @@ class EsimResearchMigrationProposalApprovalForm extends FormBase {
     return 'esim_research_migration_proposal_approval_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    $proposal_id = (int) arg(3);
+  public function buildForm(array $form, FormStateInterface $form_state) {
+    $proposal_id = (int) \Drupal::routeMatch()->getParameter('proposal_id');
+    if ($proposal_id <= 0) {
+      $this->messenger()->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
+      return [];
+    }
+
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
     $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
+    $proposal_data = $query->execute()->fetchObject();
     // $query_abstract = db_select('research_migration_submitted_abstracts_file');
     // $query_abstract->fields('research_migration_submitted_abstracts_file');
     // $query_abstract->condition('proposal_id', $proposal_id);
     // $query_abstract->condition('filetype', 'A');
     // $query_abstract_pdf = $query_abstract->execute()->fetchObject();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      } //$proposal_data = $proposal_q->fetchObject()
-      else {
-        \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-        drupal_goto('research-migration-project/manage-proposal');
-        return;
-      }
-    } //$proposal_q
-    else {
-      \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-      drupal_goto('research-migration-project/manage-proposal');
-      return;
+    if (!$proposal_data) {
+      $this->messenger()->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
+      return [];
     }
     if ($proposal_data->faculty_name == '') {
       $faculty_name = 'NA';
@@ -84,12 +80,23 @@ class EsimResearchMigrationProposalApprovalForm extends FormBase {
     //         '#title' => t('Student name'),
     //     );
 
-    $form['student_email_id'] = [
-      '#title' => t('Student Email'),
-      '#type' => 'item',
-      '#markup' => \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid)->mail,
-      '#title' => t('Email'),
-    ];
+$user_uid = Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid]);
+$contributor_link = Link::fromTextAndUrl($proposal_data->name_title . ' ' . $proposal_data->contributor_name, $user_uid)->toString();
+
+$form['contributor_name'] = [
+  '#type' => 'item',
+  '#title' => t('Student name'),
+  '#markup' => $contributor_link,
+];
+
+   $student_account = \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid);
+$email = $student_account ? $student_account->getEmail() : '';
+
+$form['student_email_id'] = [
+  '#type'    => 'item',
+  '#title'   => t('Student Email'),
+  '#plain_text' => $email !== '' ? $email : (string) t('Not available'),
+];
     $form['contributor_contact_no'] = [
       '#title' => t('Contact No.'),
       '#type' => 'item',
@@ -174,7 +181,14 @@ class EsimResearchMigrationProposalApprovalForm extends FormBase {
       //             '#title' => t('Synopsis file '),
       //             '#markup' => l($resource_file, 'research-migration-project/download/project-file/' . $proposal_id) . "",
       //         );
-
+$url = Url::fromRoute('esim_research_migration.project_files', ['proposal_id' => $proposal_id]);
+    $link = Link::fromTextAndUrl($resource_file, $url)->toString();
+    $form['abstractfilepath'] = [
+      '#type' => 'item',
+      '#title' => t('Abstract file '),
+      '#markup' => $link,
+    ];
+  
     } //$proposal_data->user_defined_compound_filepath != ""
     else {
       $form['samplefilepath'] = [
@@ -222,7 +236,7 @@ class EsimResearchMigrationProposalApprovalForm extends FormBase {
     return $form;
   }
 
-  public function validateForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  public function validateForm(array &$form, FormStateInterface $form_state) {
     if ($form_state->getValue(['approval']) == 2) {
       if ($form_state->getValue(['message']) == '') {
         $form_state->setErrorByName('message', t('Reason for disapproval could not be empty'));
@@ -230,57 +244,42 @@ class EsimResearchMigrationProposalApprovalForm extends FormBase {
     } //$form_state['values']['approval'] == 2
   }
 
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /* get current proposal */
-    $proposal_id = (int) arg(3);
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $account = $this->currentUser();
+    $proposal_id = (int) \Drupal::routeMatch()->getParameter('proposal_id');
+    if ($proposal_id <= 0) {
+      $this->messenger()->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
+      return;
+    }
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
     $query->condition('id', $proposal_id);
-    $proposal_q = $query->execute();
-    if ($proposal_q) {
-      if ($proposal_data = $proposal_q->fetchObject()) {
-        /* everything ok */
-      } //$proposal_data = $proposal_q->fetchObject()
-      else {
-        \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-        drupal_goto('research-migration-project/manage-proposal');
-        return;
-      }
-    } //$proposal_q
-    else {
-      \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-      drupal_goto('research-migration-project/manage-proposal');
+    $proposal_data = $query->execute()->fetchObject();
+    if (!$proposal_data) {
+      $this->messenger()->addError($this->t('Invalid proposal selected. Please try again.'));
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
       return;
     }
+
+    $config = \Drupal::config('esim_research_migration.settings');
+    $from = (string) ($config->get('research_migration_from_email') ?: \Drupal::config('system.site')->get('mail'));
+    $bcc = (string) $config->get('research_migration_emails');
+    $cc = (string) $config->get('research_migration_cc_emails');
+    $mail_manager = \Drupal::service('plugin.manager.mail');
+    $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
+
     if ($form_state->getValue(['approval']) == 1) {
       $query = "UPDATE {research_migration_proposal} SET approver_uid = :uid, approval_date = :date, approval_status = 1 WHERE id = :proposal_id";
       $args = [
-        ":uid" => $user->uid,
+        ":uid" => $account->id(),
         ":date" => time(),
         ":proposal_id" => $proposal_id,
       ];
       \Drupal::database()->query($query, $args);
       /* sending email */
       $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid);
-      $email_to = $user_data->mail;
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $from = variable_get('research_migration_from_email', '');
-
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $bcc = $user->mail . ', ' . variable_get('research_migration_emails', '');
-
-      // @FIXME
-      // // @FIXME
-      // // This looks like another module's variable. You'll need to rewrite this call
-      // // to ensure that it uses the correct configuration object.
-      // $cc = variable_get('research_migration_cc_emails', '');
+      $email_to = $user_data ? $user_data->getEmail() : '';
 
       $params['research_migration_proposal_approved']['proposal_id'] = $proposal_id;
       $params['research_migration_proposal_approved']['user_id'] = $proposal_data->uid;
@@ -293,19 +292,20 @@ class EsimResearchMigrationProposalApprovalForm extends FormBase {
         'Cc' => $cc,
         'Bcc' => $bcc,
       ];
-      if (!drupal_mail('research_migration', 'research_migration_proposal_approved', $email_to, language_default(), $params, $from, TRUE)) {
-        \Drupal::messenger()->addError('Error sending email message.');
+      $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_proposal_approved', $email_to, $langcode, $params, $from, TRUE);
+      if (empty($mail_result['result'])) {
+        $this->messenger()->addError($this->t('Error sending email message.'));
       }
 
       \Drupal::messenger()->addStatus('eSim Research Migration with proposal No. ' . $proposal_id . ' has been approved. The contributor has been notified of the approval');
-      drupal_goto('research-migration-project/manage-proposal');
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
       return;
     } //$form_state['values']['approval'] == 1
     else {
       if ($form_state->getValue(['approval']) == 2) {
         $query = "UPDATE {research_migration_proposal} SET approver_uid = :uid, approval_date = :date, approval_status = 2, dissapproval_reason = :dissapproval_reason WHERE id = :proposal_id";
         $args = [
-          ":uid" => $user->uid,
+          ":uid" => $account->id(),
           ":date" => time(),
           ":dissapproval_reason" => $form_state->getValue(['message']),
           ":proposal_id" => $proposal_id,
@@ -313,24 +313,7 @@ class EsimResearchMigrationProposalApprovalForm extends FormBase {
         $result = \Drupal::database()->query($query, $args);
         /* sending email */
         $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid);
-        $email_to = $user_data->mail;
-        // @FIXME
-        // // @FIXME
-        // // This looks like another module's variable. You'll need to rewrite this call
-        // // to ensure that it uses the correct configuration object.
-        // $from = variable_get('research_migration_from_email', '');
-
-        // @FIXME
-        // // @FIXME
-        // // This looks like another module's variable. You'll need to rewrite this call
-        // // to ensure that it uses the correct configuration object.
-        // $bcc = $user->mail . ', ' . variable_get('research_migration_emails', '');
-
-        // @FIXME
-        // // @FIXME
-        // // This looks like another module's variable. You'll need to rewrite this call
-        // // to ensure that it uses the correct configuration object.
-        // $cc = variable_get('research_migration_cc_emails', '');
+        $email_to = $user_data ? $user_data->getEmail() : '';
 
         $params['research_migration_proposal_disapproved']['proposal_id'] = $proposal_id;
         $params['research_migration_proposal_disapproved']['user_id'] = $proposal_data->uid;
@@ -343,16 +326,16 @@ class EsimResearchMigrationProposalApprovalForm extends FormBase {
           'Cc' => $cc,
           'Bcc' => $bcc,
         ];
-        if (!drupal_mail('research_migration', 'research_migration_proposal_disapproved', $email_to, language_default(), $params, $from, TRUE)) {
-          \Drupal::messenger()->addError('Error sending email message.');
+        $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_proposal_disapproved', $email_to, $langcode, $params, $from, TRUE);
+        if (empty($mail_result['result'])) {
+          $this->messenger()->addError($this->t('Error sending email message.'));
         }
 
         \Drupal::messenger()->addError('eSim Research Migration with Proposal No. ' . $proposal_id . ' has been disapproved. The contributor has been notified of the disapproval.');
-        drupal_goto('research-migration-project/manage-proposal');
+        $form_state->setRedirect('esim_research_migration.proposal_pending');
         return;
       }
     } //$form_state['values']['approval'] == 2
   }
 
 }
-?>

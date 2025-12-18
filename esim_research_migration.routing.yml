@@ -12,6 +12,13 @@ esim_research_migration.proposal_form:
     _form: \Drupal\esim_research_migration\Form\EsimResearchMigrationProposalForm
   requirements:
     _permission: 'Research Migration create proposal'
+esim_research_migration.manage_proposal:
+  path: /research-migration-project/manage-proposal
+  defaults:
+    _title: 'Manage Research Migration Proposals'
+    _controller: '\Drupal\esim_research_migration\Controller\DefaultController::manageProposalRedirect'
+  requirements:
+    _permission: 'Research Migration manage proposal'
 esim_research_migration.proposal_pending:
   path: /research-migration-project/manage-proposal/pending
   defaults:
@@ -34,7 +41,7 @@ esim_research_migration.proposal_edit_file_all:
   requirements:
     _permission: 'Research Migration manage proposal'
 esim_research_migration.proposal_approval_form:
-  path: /research-migration-project/manage-proposal/approve
+  path: /research-migration-project/manage-proposal/approve/{proposal_id}
   defaults:
     _title: 'Approve Proposal'
     _form: \Drupal\esim_research_migration\Form\EsimResearchMigrationProposalApprovalForm
@@ -48,7 +55,7 @@ esim_research_migration.proposal_edit_form:
   requirements:
     _permission: 'Research Migration manage proposal'
 esim_research_migration.proposal_status_form:
-  path: /research-migration-project/manage-proposal/status
+  path: /research-migration-project/manage-proposal/status/{proposal_id}
   defaults:
     _title: 'Proposal Status'
     _form: \Drupal\esim_research_migration\Form\EsimResearchMigrationProposalStatusForm
@@ -86,10 +93,11 @@ esim_research_migration.upload_code_delete:
   path: /research-migration-project/abstract-code/delete
   defaults:
     _title: 'Delete Solution'
+    _form: \Drupal\esim_research_migration\Form\EsimResearchMigrationDeleteSolutionForm
   requirements:
-    _permission: 'Research Migration upload code'
+    _permission: 'Research Migration upload abstract'
 esim_research_migration.download_full_project:
-  path: /research-migration-project/full-download/project
+  path: /research-migration-project/full-download/project/{proposal_id}
   defaults:
     _title: 'Code Download'
     _controller: '\Drupal\esim_research_migration\Controller\DefaultController::esim_research_migration_download_full_project'
@@ -123,26 +131,34 @@ esim_research_migration.run_form:
     _form: \Drupal\esim_research_migration\Form\EsimResearchMigrationRunForm
   requirements:
     _permission: 'Research Migration download code'
+esim_research_migration.run_form_with_id:
+  path: /research-migration-project/research-migration-run/{proposal_id}
+  defaults:
+    _title: 'Download Codes'
+    _form: \Drupal\esim_research_migration\Form\EsimResearchMigrationRunForm
+  requirements:
+    _permission: 'Research Migration download code'
 esim_research_migration.download_upload_file:
   path: /research-migration-project/download/resource-file
   defaults:
     _title: 'Download user defined compound file'
+    _controller: '\Drupal\esim_research_migration\Controller\DefaultController::downloadUploadFile'
   requirements:
-    _permission: 'download code'
+    _permission: 'Research Migration download code'
 esim_research_migration.download_research_migration_project_title_files:
-  path: /research-migration-project/download/project-title-file
+  path: /research-migration-project/download/project-title-file/{project_title_id}
   defaults:
     _title: 'Download Project Title file'
     _controller: '\Drupal\esim_research_migration\Controller\DefaultController::download_research_migration_project_title_files'
   requirements:
-    _permission: 'download code'
+    _permission: 'Research Migration download code'
 esim_research_migration.project_files:
-  path: /research-migration-project/download/project-file
+  path: /research-migration-project/download/project-file/{proposal_id}
   defaults:
     _title: 'Download Project file'
     _controller: '\Drupal\esim_research_migration\Controller\DefaultController::esim_research_migration_project_files'
   requirements:
-    _permission: 'download code'
+    _permission: 'Research Migration download code'
 esim_research_migration.settings_form:
   path: /admin/settings/research-migration
   defaults:
@@ -158,17 +174,17 @@ esim_research_migration._list_research_migration_certificates:
   requirements:
     _permission: 'list Research Migration certificates'
 esim_research_migration.generate_pdf:
-  path: /research-migration-project/certificates/generate-pdf
+  path: /research-migration-project/certificates/generate-pdf/{proposal_id}
   defaults:
     _title: 'Download Certificate'
-    _form: \Drupal\esim_research_migration\Form\GeneratePdf
+    _controller: '\Drupal\esim_research_migration\Controller\DefaultController::generatePdf'
   requirements:
     _permission: 'generate pdf'
 esim_research_migration.verify_certificates_verify_certificates:
-  path: /research-migration-project/certificates/verify
+  path: /research-migration-project/certificates/verify/{qr_code}
   defaults:
-    qr_code: verify_certificates
     _title: 'Certificate Verification'
     _controller: '\Drupal\esim_research_migration\Controller\DefaultController::verify_certificates'
+    qr_code: ''
   requirements:
     _permission: 'verify rm certificates'

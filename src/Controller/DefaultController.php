@@ -1,192 +1,143 @@
-<?php /**
+<?php
+
+/**
  * @file
  * Contains \Drupal\esim_research_migration\Controller\DefaultController.
  */
 
 namespace Drupal\esim_research_migration\Controller;
 
-use Drupal\Core\Form\FormBase;
-use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Link;
-use Drupal\Core\Url;
-use Symfony\Component\HttpFoundation\Response;
-use Drupal\Core\Routing\RouteMatchInterface;
-use Drupal\Core\Database\Database;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Drupal\Core\File\FileSystemInterface;
-use Drupal\Service;
-use Drupal\user\Entity\User;
-use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Url;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use ZipArchive;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 /**
  * Default controller for the esim_research_migration module.
  */
 class DefaultController extends ControllerBase {
 
-public function esim_research_migration_proposal_pending() {
-  $pending_rows = [];
-
-  $query = \Drupal::database()->select('research_migration_proposal', 'r');
-  $query->fields('r');
-  $query->condition('r.approval_status', 0);
-  $query->orderBy('r.id', 'DESC');
-  $pending_q = $query->execute();
-
-  while ($pending_data = $pending_q->fetchObject()) {
-    $submission_date = date('d-m-Y', $pending_data->creation_date);
-
-    $user_link = Link::fromTextAndUrl(
-      $pending_data->name_title . ' ' . $pending_data->contributor_name,
-      Url::fromUri('internal:/user/' . $pending_data->uid)
-    )->toRenderable();
-
-    $approve_link = Link::fromTextAndUrl(
-      'Approve',
-      Url::fromUri('internal:/research-migration-project/manage-proposal/approve/' . $pending_data->id)
-    )->toRenderable();
-
-    $edit_link = Link::fromTextAndUrl(
-      'Edit',
-      Url::fromUri('internal:/research-migration-project/manage-proposal/edit/' . $pending_data->id)
-    )->toRenderable();
-
-    $action_links = [
-      '#type' => 'inline_template',
-      '#template' => '{{ approve }} | {{ edit }}',
-      '#context' => [
-        'approve' => render($approve_link),
-        'edit' => render($edit_link),
-      ],
-    ];
-
-    $pending_rows[] = [
-      ['data' => $submission_date],
-      ['data' => $user_link],
-      ['data' => $pending_data->project_title],
-      ['data' => $action_links],
-    ];
+  public function manageProposalRedirect() {
+    return $this->redirect('esim_research_migration.proposal_pending');
   }
 
-  if (empty($pending_rows)) {
-    \Drupal::messenger()->addStatus(t('There are no pending proposals.'));
+  public function esim_research_migration_proposal_pending() {
+    $pending_rows = [];
+
+    $query = \Drupal::database()->select('research_migration_proposal', 'r');
+    $query->fields('r');
+    $query->condition('r.approval_status', 0);
+    $query->orderBy('r.id', 'DESC');
+    $pending_q = $query->execute();
+
+    foreach ($pending_q as $pending_data) {
+      $submission_date = date('d-m-Y', $pending_data->creation_date);
+
+      $user_link = Link::fromTextAndUrl(
+        $pending_data->name_title . ' ' . $pending_data->contributor_name,
+        Url::fromRoute('entity.user.canonical', ['user' => $pending_data->uid])
+      )->toRenderable();
+
+      $approve_link = Link::fromTextAndUrl(
+        $this->t('Approve'),
+        Url::fromRoute('esim_research_migration.proposal_approval_form', ['proposal_id' => $pending_data->id])
+      )->toString();
+
+      $edit_link = Link::fromTextAndUrl(
+        $this->t('Edit'),
+        Url::fromRoute('esim_research_migration.proposal_edit_form', ['proposal_id' => $pending_data->id])
+      )->toString();
+
+      $action_markup = Markup::create($approve_link . ' | ' . $edit_link);
+
+      $pending_rows[] = [
+        ['data' => $submission_date],
+        ['data' => $user_link],
+        ['data' => $pending_data->project_title],
+        ['data' => ['#markup' => $action_markup]],
+      ];
+    }
+
     return [
-      '#markup' => '',
+      '#type' => 'table',
+      '#header' => [
+        $this->t('Date of Submission'),
+        $this->t('Student Name'),
+        $this->t('Title of the Research Migration Project'),
+        $this->t('Action'),
+      ],
+      '#rows' => $pending_rows,
+      '#attributes' => ['class' => ['research-migration-pending-table']],
+      '#empty' => $this->t('There are no pending proposals.'),
     ];
   }
-
-  $pending_header = [
-    t('Date of Submission'),
-    t('Student Name'),
-    t('Title of the Research Migration Project'),
-    t('Action'),
-  ];
-
-  $output = [
-    '#type' => 'table',
-    '#header' => $pending_header,
-    '#rows' => $pending_rows,
-    '#attributes' => ['class' => ['research-migration-pending-table']],
-    '#empty' => t('There are no pending proposals.'),
-  ];
-
-  return $output;
-}
 
   public function esim_research_migration_proposal_all() {
-    /* get pending proposals to be approved */
     $proposal_rows = [];
-    $query = \Drupal::database()->select('research_migration_proposal');
-    $query->fields('research_migration_proposal');
+
+    $query = \Drupal::database()->select('research_migration_proposal', 'p');
+    $query->fields('p');
     $query->orderBy('id', 'DESC');
     $proposal_q = $query->execute();
-    while ($proposal_data = $proposal_q->fetchObject()) {
-      $approval_status = '';
-      switch ($proposal_data->approval_status) {
-        case 0:
-          $approval_status = 'Pending';
-          break;
-        case 1:
-          $approval_status = 'Approved';
-          break;
-        case 2:
-          $approval_status = 'Dis-approved';
-          break;
-        case 3:
-          $approval_status = 'Completed';
-          break;
-        case 5:
-          $approval_status = 'On Hold';
-          break;
-        default:
-          $approval_status = 'Unknown';
-          break;
-      } //$proposal_data->approval_status
-      if ($proposal_data->actual_completion_date == 0) {
-        $actual_completion_date = "Not Completed";
-      } //$proposal_data->actual_completion_date == 0
-      else {
-        $actual_completion_date = date('d-m-Y', $proposal_data->actual_completion_date);
-      }
-      if ($proposal_data->approval_date == 0) {
-        $approval_date = "Not Approved";
-      } //$proposal_data->actual_completion_date == 0
-      else {
-        $approval_date = date('d-m-Y', $proposal_data->approval_date);
-      }
- 
-$proposal_rows[] = [
-  date('d-m-Y', $proposal_data->creation_date),
 
-  // Link to user profile
-  Link::fromTextAndUrl(
-    $proposal_data->contributor_name,
-    Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid]))->toString(),
+    foreach ($proposal_q as $proposal_data) {
+      $approval_status = match ($proposal_data->approval_status) {
+        0 => $this->t('Pending'),
+        1 => $this->t('Approved'),
+        2 => $this->t('Dis-approved'),
+        3 => $this->t('Completed'),
+        5 => $this->t('On Hold'),
+        default => $this->t('Unknown'),
+      };
 
-    $approval_date,
-    $actual_completion_date,
-    $approval_status,
-    $proposal_data->project_title,
+      $actual_completion_date = $proposal_data->actual_completion_date
+        ? date('d-m-Y', $proposal_data->actual_completion_date)
+        : $this->t('Not Completed');
+      $approval_date = $proposal_data->approval_date
+        ? date('d-m-Y', $proposal_data->approval_date)
+        : $this->t('Not Approved');
 
-  // Action links: Status | Edit
-  Link::fromTextAndUrl(
-    'Status',
-    Url::fromRoute('esim_research_migration.proposal_status_form', ['id' => $proposal_data->id])
-  )->toString() .
-  ' | ' .
-  Link::fromTextAndUrl(
-    'Edit',
-    Url::fromRoute('esim_research_migration.proposal_edit_form', ['id' => $proposal_data->id])
-  )->toString(),
-];
+      $status_link = Link::fromTextAndUrl(
+        $this->t('Status'),
+        Url::fromRoute('esim_research_migration.proposal_status_form', ['proposal_id' => $proposal_data->id])
+      )->toString();
+      $edit_link = Link::fromTextAndUrl(
+        $this->t('Edit'),
+        Url::fromRoute('esim_research_migration.proposal_edit_form', ['proposal_id' => $proposal_data->id])
+      )->toString();
+
+      $proposal_rows[] = [
+        date('d-m-Y', $proposal_data->creation_date),
+        Markup::create(Link::fromTextAndUrl(
+          $proposal_data->contributor_name,
+          Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid])
+        )->toString()),
+        $proposal_data->project_title,
+        $approval_date,
+        $actual_completion_date,
+        $approval_status,
+        Markup::create($status_link . ' | ' . $edit_link),
+      ];
     }
-    if (empty($proposal_rows)) {
-  \Drupal::messenger()->addStatus(t('There are no proposals.'));
-  return ['#markup' => t('No proposals found.')];
-}
 
-$proposal_header = [
-  'Date of Submission',
-  'Student Name',
-  'Title of the Research Migration project',
-  'Date of Approval',
-  'Date of Project Completion',
-  'Status',
-  'Action',
-];
-
-$output = [
-  '#type' => 'table',
-  '#header' => $proposal_header,
-  '#rows' => $proposal_rows,
-  '#attributes' => ['class' => ['proposal-table']],
-  '#empty' => t('No proposals found.'),
-];
-
-return $output;
-    
+    return [
+      '#type' => 'table',
+      '#header' => [
+        $this->t('Date of Submission'),
+        $this->t('Student Name'),
+        $this->t('Title of the Research Migration project'),
+        $this->t('Date of Approval'),
+        $this->t('Date of Project Completion'),
+        $this->t('Status'),
+        $this->t('Action'),
+      ],
+      '#rows' => $proposal_rows,
+      '#attributes' => ['class' => ['proposal-table']],
+      '#empty' => $this->t('No proposals found.'),
+    ];
   }
 
 public function esim_research_migration_proposal_edit_file_all() {
@@ -225,8 +176,8 @@ public function esim_research_migration_proposal_edit_file_all() {
     )->toString();
 
     $edit_link = Link::fromTextAndUrl(
-      'Edit',
-      Url::fromUserInput('/research-migration-project/abstract-code/edit-upload-files/' . $proposal_data->id)
+      $this->t('Edit'),
+      Url::fromRoute('esim_research_migration.edit_upload_abstract_code_form', [], ['query' => ['proposal_id' => $proposal_data->id]])
     )->toString();
 
     $proposal_rows[] = [
@@ -318,11 +269,17 @@ public function esim_research_migration_proposal_edit_file_all() {
 
     if (!empty($abstracts_q)) {
       if ($abstracts_q->is_submitted == 0) {
-        $url = Link::fromTextAndUrl('Edit', Url::fromUserInput('/research-migration-project/abstract-code/upload'))->toString();
+        $url = Link::fromTextAndUrl(
+          $this->t('Edit'),
+          Url::fromRoute('esim_research_migration.upload_abstract_code_form')
+        )->toString();
       }
     }
   } else {
-    $url = Link::fromTextAndUrl('Upload Case Directory', Url::fromUserInput('/research-migration-project/abstract-code/upload'))->toString();
+    $url = Link::fromTextAndUrl(
+      $this->t('Upload Case Directory'),
+      Url::fromRoute('esim_research_migration.upload_abstract_code_form')
+    )->toString();
   }
 
   // Build HTML output
@@ -341,366 +298,555 @@ public function esim_research_migration_proposal_edit_file_all() {
 
 
   public function esim_research_migration_download_full_project() {
-    $user = \Drupal::currentUser();
-    $id = arg(3);
-    $root_path = esim_research_migration_path();
-    //var_dump($root_path);die;
-    $query = \Drupal::database()->select('research_migration_proposal');
-    $query->fields('research_migration_proposal');
-    $query->condition('id', $id);
-    $research_migration_q = $query->execute();
-    $research_migration_data = $research_migration_q->fetchObject();
-    $research_migration_PATH = $research_migration_data->directory_name . '/';
-    /* zip filename */
-    $zip_filename = $root_path . 'zip-' . time() . '-' . rand(0, 999999) . '.zip';
-    /* creating zip archive on the server */
+    $proposal_id = $this->resolveIdentifier();
+    if (!$proposal_id) {
+      $this->messenger()->addError($this->t('Missing proposal identifier.'));
+      return $this->redirect('esim_research_migration.proposal_all');
+    }
+
+    $database = \Drupal::database();
+    $proposal = $database->select('research_migration_proposal', 'r')
+      ->fields('r')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+
+    if (!$proposal) {
+      $this->messenger()->addError($this->t('Unable to find the requested proposal.'));
+      return $this->redirect('esim_research_migration.proposal_all');
+    }
+
+    $root_path = rtrim(esim_research_migration_path(), '/') . '/';
+    $directory_name = trim($proposal->directory_name, '/');
+    $zip_filename = $root_path . 'zip-' . time() . '-' . random_int(0, 999999) . '.zip';
+
     $zip = new ZipArchive();
-    $zip->open($zip_filename, ZipArchive::CREATE);
-    $query = \Drupal::database()->select('research_migration_proposal');
-    $query->fields('research_migration_proposal');
-    $query->condition('id', $id);
-    $circuit_simulation_udc_q = $query->execute();
-    $query = \Drupal::database()->select('research_migration_proposal');
-    $query->fields('research_migration_proposal');
-    $query->condition('id', $id);
-    $query = \Drupal::database()->select('research_migration_submitted_abstracts_file');
-    $query->fields('research_migration_submitted_abstracts_file');
-    $query->condition('proposal_id', $id);
-    $project_files = $query->execute();
-    while ($esim_project_files = $project_files->fetchObject()) {
-      $zip->addFile($root_path . $research_migration_PATH . $esim_project_files->filepath, $research_migration_PATH . str_replace(' ', '_', basename($esim_project_files->filename)));
+    if ($zip->open($zip_filename, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+      $this->messenger()->addError($this->t('Could not create archive for download.'));
+      return $this->redirect('esim_research_migration.proposal_all');
     }
-    $zip_file_count = $zip->numFiles;
-    $zip->close();
-    if ($zip_file_count > 0) {
-      if ($user->uid) {
-        /* download zip file */
-        header('Content-Type: application/zip');
-        header('Content-disposition: attachment; filename="' . str_replace(' ', '_', $research_migration_data->project_title) . '.zip"');
-        header('Content-Length: ' . filesize($zip_filename));
-        ob_end_flush();
-        ob_clean();
-        flush();
-        readfile($zip_filename);
-        unlink($zip_filename);
-      } //$user->uid
-      else {
-        header('Content-Type: application/zip');
-        header('Content-disposition: attachment; filename="' . str_replace(' ', '_', $research_migration_data->project_title) . '.zip"');
-        header('Content-Length: ' . filesize($zip_filename));
-        header("Content-Transfer-Encoding: binary");
-        header('Expires: 0');
-        header('Pragma: no-cache');
-        ob_end_flush();
-        ob_clean();
-        flush();
-        readfile($zip_filename);
-        unlink($zip_filename);
+
+    $files = $database->select('research_migration_submitted_abstracts_file', 'f')
+      ->fields('f')
+      ->condition('proposal_id', $proposal_id)
+      ->execute();
+
+    $added_files = 0;
+    foreach ($files as $file) {
+      $source = $root_path . $directory_name . '/' . ltrim($file->filepath, '/');
+      if (is_file($source)) {
+        $destination = $directory_name . '/' . str_replace(' ', '_', basename($file->filename));
+        $zip->addFile($source, $destination);
+        $added_files++;
       }
-    } //$zip_file_count > 0
-    else {
-      \Drupal::messenger()->addError("There are no research migration project in this proposal to download");
-      drupal_goto('research-migration-project/full-download/project');
     }
+    $zip->close();
+
+    if ($added_files === 0) {
+      $this->messenger()->addError($this->t('There are no project files available for download.'));
+      @unlink($zip_filename);
+      return $this->redirect('esim_research_migration.proposal_all');
+    }
+
+    $download_name = str_replace(' ', '_', $proposal->project_title) . '.zip';
+    $response = new BinaryFileResponse($zip_filename);
+    $response->setContentDisposition('attachment', $download_name);
+    $response->deleteFileAfterSend(TRUE);
+
+    return $response;
   }
 
   public function esim_research_migration_completed_proposals_all() {
-    $output = "";
-    $query = \Drupal::database()->select('research_migration_proposal');
-    $query->fields('research_migration_proposal');
+    $query = \Drupal::database()->select('research_migration_proposal', 'r');
+    $query->fields('r');
     $query->condition('approval_status', 3);
     $query->orderBy('actual_completion_date', 'DESC');
-    //$query->condition('is_completed', 1);
     $result = $query->execute();
+ $records = $result->fetchAll();
+    $rows = [];
+    $counter = count($records);
+    foreach ($result as $row) {
+      $year = $row->actual_completion_date ? date('Y', $row->actual_completion_date) : $this->t('NA');
+      $project_link = Link::fromTextAndUrl(
+        $row->project_title,
+        Url::fromRoute('esim_research_migration.run_form_with_id', ['proposal_id' => $row->id])
+      )->toString();
 
-    //var_dump($research_migration_abstract);die;
-    if ($result->rowCount() == 0) {
-      $output .= "Currently, there are no submissions in this section. Click <a href='proposal'>here</a> to propose a Research Migration Project." . "<hr>";
-
-    } //$result->rowCount() == 0
-    else {
-      $output .= "Work has been completed for the following research migrations. We welcome your contributions." . "<hr>";
-      $preference_rows = [];
-      $i = $result->rowCount();
-      while ($row = $result->fetchObject()) {
-        $proposal_id = $row->id;
-        $query1 = \Drupal::database()->select('research_migration_submitted_abstracts_file');
-        $query1->fields('research_migration_submitted_abstracts_file');
-        $query1->condition('file_approval_status', 1);
-        $query1->condition('proposal_id', $proposal_id);
-        $research_migration_files = $query1->execute();
-        $research_migration_abstract = $research_migration_files->fetchObject();
-
-        // @FIXME
-        // l() expects a Url object, created from a route name or external URI.
-        // $project_title = l($row->project_title, "research-migration-project/research-migration-run/" . $row->id);
-
-        $year = date("Y", $row->actual_completion_date);
-        $preference_rows[] = [
-          $i,
-          $project_title,
-          $row->contributor_name,
-          $row->institute,
-          $year,
-        ];
-        $i--;
-      } //$row = $result->fetchObject()
-      $preference_header = [
-        'No',
-        'Research Migration Project',
-        'Contributor Name',
-        'University/ Institute',
-        'Year of Completion',
+      $rows[] = [
+        $counter,
+        Markup::create($project_link),
+        $row->contributor_name,
+        $row->institute,
+        $year,
       ];
-      // @FIXME
-      // theme() has been renamed to _theme() and should NEVER be called directly.
-      // Calling _theme() directly can alter the expected output and potentially
-      // introduce security issues (see https://www.drupal.org/node/2195739). You
-      // should use renderable arrays instead.
-      // 
-      // 
-      // @see https://www.drupal.org/node/2195739
-      // $output .= theme('table', array(
-      // 			'header' => $preference_header,
-      // 			'rows' => $preference_rows
-      // 		));
-
+      $counter--;
     }
-    return $output;
+
+    $proposal_link = Link::fromTextAndUrl(
+      $this->t('here'),
+      Url::fromRoute('esim_research_migration.proposal_form')
+    )->toString();
+
+    return [
+      '#theme' => 'table',
+      '#caption' => $this->t('Work has been completed for the following research migrations. We welcome your contributions.'),
+      '#header' => [
+        $this->t('No'),
+        $this->t('Research Migration Project'),
+        $this->t('Contributor Name'),
+        $this->t('University/ Institute'),
+        $this->t('Year of Completion'),
+      ],
+      '#rows' => $rows,
+      '#empty' => Markup::create($this->t('Currently, there are no submissions in this section. Click @link to propose a Research Migration Project.', [
+        '@link' => $proposal_link,
+      ])),
+      '#attributes' => ['class' => ['research-migration-completed-table']],
+    ];
   }
 
   public function esim_research_migration_progress_all() {
-    $page_content = "";
-    $query = \Drupal::database()->select('research_migration_proposal');
-    $query->fields('research_migration_proposal');
+    $query = \Drupal::database()->select('research_migration_proposal', 'r');
+    $query->fields('r');
     $query->condition('approval_status', 1);
     $query->condition('is_completed', 0);
     $query->orderBy('approval_date', 'DESC');
     $result = $query->execute();
-    if ($result->rowCount() == 0) {
-      $page_content .= "Currently, there are no submissions in progress. Click <a href='proposal'>here</a> to propose a Research Migration Project.<hr>";
-    } //$result->rowCount() == 0
-    else {
-      $page_content .= "Work is in progress for the following submissions under the Research Migration Project<hr>";
-      $preference_rows = [];
-      $i = $result->rowCount();
-      while ($row = $result->fetchObject()) {
-        $approval_date = date("Y", $row->approval_date);
-        $preference_rows[] = [
-          $i,
-          $row->project_title,
-          $row->contributor_name,
-          $row->institute,
-          $approval_date,
-        ];
-        $i--;
-      } //$row = $result->fetchObject()
-      $preference_header = [
-        'No',
-        'Research Migration Project',
-        'Contributor Name',
-        'Institute',
-        'Year',
+$result1 = $result->fetchAll();
+    $rows = [];
+    $counter = Count($result1);
+    foreach ($result as $row) {
+      $approval_year = $row->approval_date ? date('Y', $row->approval_date) : $this->t('NA');
+      $rows[] = [
+        $counter,
+        $row->project_title,
+        $row->contributor_name,
+        $row->institute,
+        $approval_year,
       ];
-      // @FIXME
-      // theme() has been renamed to _theme() and should NEVER be called directly.
-      // Calling _theme() directly can alter the expected output and potentially
-      // introduce security issues (see https://www.drupal.org/node/2195739). You
-      // should use renderable arrays instead.
-      // 
-      // 
-      // @see https://www.drupal.org/node/2195739
-      // $page_content .= theme('table', array(
-      // 			'header' => $preference_header,
-      // 			'rows' => $preference_rows
-      // 		));
-
+      $counter--;
     }
-    return $page_content;
+
+    $proposal_link = Link::fromTextAndUrl(
+      $this->t('here'),
+      Url::fromRoute('esim_research_migration.proposal_form')
+    )->toString();
+
+    return [
+      '#theme' => 'table',
+      '#caption' => $this->t('Work is in progress for the following submissions under the Research Migration Project.'),
+      '#header' => [
+        $this->t('No'),
+        $this->t('Research Migration Project'),
+        $this->t('Contributor Name'),
+        $this->t('Institute'),
+        $this->t('Year'),
+      ],
+      '#rows' => $rows,
+      // '#empty' => Markup::create($this->t('Currently, there are no submissions in progress. Click @link to propose a Research Migration Project.', [
+      //   '@link' => $proposal_link,
+      // ])),
+      '#attributes' => ['class' => ['research-migration-progress-table']],
+    ];
   }
 
   public function list_of_available_project_titles() {
-    $output = "";
-    //$static_url = "https://static.fossee.in/esim/project-titles/";
     $preference_rows = [];
     $i = 1;
     $query = \Drupal::database()->query("SELECT * from rm_list_of_project_titles WHERE {rm_project_title_name} NOT IN( SELECT  project_title from research_migration_proposal WHERE approval_status = 0 OR approval_status = 1 OR approval_status = 3)");
     while ($result = $query->fetchObject()) {
-      // @FIXME
-// l() expects a Url object, created from a route name or external URI.
-// $preference_rows[] = array(
-// 				$i,
-// 				//print_r(array_keys($case_studies_list))
-// 				$result->rm_project_title_name,
-// 				l('Click Here', $result->rm_project_link , array('attributes' => array('target'=>'_blank')))
-// 				//l(Download, 'research-migration-project/download/project-title-file/' .$result->id)
-// 				);
+      $link = '';
+      if (!empty($result->rm_project_link)) {
+        $link = Link::fromTextAndUrl(
+          $this->t('Click Here'),
+          Url::fromUri($result->rm_project_link, ['attributes' => ['target' => '_blank', 'rel' => 'noopener noreferrer']])
+        )->toString();
+      }
+      $download_link = Link::fromTextAndUrl(
+        $this->t('Download'),
+        Url::fromRoute('esim_research_migration.download_research_migration_project_title_files', ['project_title_id' => $result->id])
+      )->toString();
 
+      $preference_rows[] = [
+        $i,
+        $result->rm_project_title_name,
+        Markup::create($link),
+        Markup::create($download_link),
+      ];
       $i++;
     }
-    $preference_header = [
-      'No',
-      'List of available projects',
-      'Link to the paper',
+    return [
+      '#theme' => 'table',
+      '#header' => [
+        $this->t('No'),
+        $this->t('List of available projects'),
+        $this->t('Link to the paper'),
+        $this->t('Download'),
+      ],
+      '#rows' => $preference_rows,
+      '#empty' => $this->t('No project titles available at the moment.'),
+      '#attributes' => ['class' => ['research-migration-project-titles-table']],
     ];
-    // @FIXME
-    // theme() has been renamed to _theme() and should NEVER be called directly.
-    // Calling _theme() directly can alter the expected output and potentially
-    // introduce security issues (see https://www.drupal.org/node/2195739). You
-    // should use renderable arrays instead.
-    // 
-    // 
-    // @see https://www.drupal.org/node/2195739
-    // $output .= theme('table', array(
-    // 			'header' => $preference_header,
-    // 			'rows' => $preference_rows
-    // 		));
-
-
-    return $output;
   }
 
   public function download_research_migration_project_title_files() {
-    $id = arg(3);
-    $root_path = esim_research_migration_project_titles_resource_file_path();
-    $query = \Drupal::database()->select('rm_list_of_project_titles');
-    $query->fields('rm_list_of_project_titles');
-    $query->condition('id', $id);
-    $result = $query->execute();
-    $rm_project_files_list = $result->fetchObject();
-    //$directory_name = $case_study_project_files_list->filepath;
-    $abstract_file = $rm_project_files_list->filepath;
-    ob_clean();
-    header("Pragma: public");
-    header("Expires: 0");
-    header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-    header("Cache-Control: public");
-    header("Content-Description: File Transfer");
-    header("Content-Type: application/pdf");
-    header('Content-disposition: attachment; filename="' . $abstract_file . '"');
-    header("Content-Length: " . filesize($root_path . $abstract_file));
-    header("Content-Transfer-Encoding: binary");
-    header("Expires: 0");
-    header("Pragma: no-cache");
-    readfile($root_path . $abstract_file);
-    ob_end_flush();
-    ob_clean();
+    $file_id = $this->resolveIdentifier('project_title_id') ?? $this->resolveIdentifier('id');
+    if (!$file_id) {
+      $this->messenger()->addError($this->t('Missing project title identifier.'));
+      return $this->redirect('esim_research_migration.list_of_available_project_titles');
+    }
+
+    $record = \Drupal::database()->select('rm_list_of_project_titles', 't')
+      ->fields('t')
+      ->condition('id', $file_id)
+      ->execute()
+      ->fetchObject();
+
+    if (!$record || empty($record->filepath)) {
+      $this->messenger()->addError($this->t('Unable to find the requested resource.'));
+      return $this->redirect('esim_research_migration.list_of_available_project_titles');
+    }
+
+    $root_path = rtrim(esim_research_migration_project_titles_resource_file_path(), '/');
+    $file_path = $root_path . '/' . ltrim($record->filepath, '/');
+
+    if (!is_file($file_path)) {
+      $this->messenger()->addError($this->t('The requested file is not available.'));
+      return $this->redirect('esim_research_migration.list_of_available_project_titles');
+    }
+
+    $response = new BinaryFileResponse($file_path);
+    $response->setContentDisposition('attachment', basename($file_path));
+    return $response;
   }
 
   public function esim_research_migration_project_files() {
-    $proposal_id = arg(3);
-    $root_path = esim_research_migration_path();
-    // $query = db_select('research_migration_submitted_abstracts_file');
-    // $query->fields('research_migration_submitted_abstracts_file');
-    // $query->condition('proposal_id', $proposal_id);
-    // $query->condition('filetype', 'A');
-    // $result = $query->execute();
-    // $esim_research_migration_project_files = $result->fetchObject();
-    $query1 = \Drupal::database()->select('research_migration_proposal');
-    $query1->fields('research_migration_proposal');
-    $query1->condition('id', $proposal_id);
-    $result1 = $query1->execute();
-    $research_migration = $result1->fetchObject();
-    $directory_name = $research_migration->directory_name . '/';
-    $str = substr($research_migration->samplefilepath, strrpos($research_migration->samplefilepath, '/'));
-    $resource_file = ltrim($str, '/');
-    $abstract_file = $research_migration->samplefilepath;
-    //var_dump('abstract_file(filepath):' . $abstract_file . '    resource_file(filename):' . $resource_file);die;
-    ob_clean();
-    header("Pragma: public");
-    header("Expires: 0");
-    header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-    header("Cache-Control: public");
-    header("Content-Description: File Transfer");
-    header("Content-Type: application/pdf");
-    header('Content-disposition: attachment; filename="' . $resource_file . '"');
-    header("Content-Length: " . filesize($root_path . $abstract_file));
-    header("Content-Transfer-Encoding: binary");
-    header("Expires: 0");
-    header("Pragma: no-cache");
-    readfile($root_path . $abstract_file);
-    ob_end_flush();
-    ob_clean();
+    $proposal_id = $this->resolveIdentifier();
+    if (!$proposal_id) {
+      $this->messenger()->addError($this->t('Missing proposal identifier.'));
+      return $this->redirect('esim_research_migration.proposal_all');
+    }
+
+    $proposal = \Drupal::database()->select('research_migration_proposal', 'p')
+      ->fields('p')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+
+    if (!$proposal || empty($proposal->samplefilepath)) {
+      $this->messenger()->addError($this->t('No synopsis file available for this proposal.'));
+      return $this->redirect('esim_research_migration.proposal_all');
+    }
+
+    $root_path = rtrim(esim_research_migration_path(), '/') . '/';
+    $file_path = $root_path . ltrim($proposal->samplefilepath, '/');
+
+    if (!is_file($file_path)) {
+      $this->messenger()->addError($this->t('The requested file is not available.'));
+      return $this->redirect('esim_research_migration.proposal_all');
+    }
+
+    $response = new BinaryFileResponse($file_path);
+    $response->setContentDisposition('attachment', basename($file_path));
+    return $response;
   }
 
   public function _list_research_migration_certificates() {
-    $user = \Drupal::currentUser();
-    $query_id = \Drupal::database()->query("SELECT id FROM research_migration_proposal WHERE approval_status=3 AND uid= :uid", [
-      ':uid' => $user->uid
-      ]);
-    $exist_id = $query_id->fetchObject();
-    //var_dump($exist_id->id);die;
-    if ($exist_id) {
-      if ($exist_id->id) {
-        if ($exist_id->id < 1) {
-          \Drupal::messenger()->addStatus('<strong>You need to propose a <a href="https://esim.fossee.in/research-migration-project/proposal">Research Migration Proposal</a></strong> or if you have already proposed then your Research Migration is under reviewing process');
-          return '';
-        } //$exist_id->id < 3
-        else {
-          $search_rows = [];
-          global $output;
-          $output = '';
-          $query3 = \Drupal::database()->query("SELECT id,project_title,contributor_name FROM research_migration_proposal WHERE approval_status=3 AND uid= :uid", [
-            ':uid' => $user->uid
-            ]);
-          while ($search_data3 = $query3->fetchObject()) {
-            if ($search_data3->id) {
-              // @FIXME
-// l() expects a Url object, created from a route name or external URI.
-// $search_rows[] = array(
-// 						$search_data3->project_title,
-// 						$search_data3->contributor_name,
-// 						l('Download Certificate', 'research-migration-project/certificates/generate-pdf/' . $search_data3->id)
-// 					);
+    $user = $this->currentUser();
+    $proposals = \Drupal::database()->query("SELECT id, project_title, contributor_name FROM research_migration_proposal WHERE approval_status = 3 AND uid = :uid", [
+      ':uid' => $user->id(),
+    ]);
 
-            } //$search_data3->id
-          } //$search_data3 = $query3->fetchObject()
-          if ($search_rows) {
-            $search_header = [
-              'Project Title',
-              'Contributor Name',
-              'Download Certificates',
-            ];
-            // @FIXME
-            // theme() has been renamed to _theme() and should NEVER be called directly.
-            // Calling _theme() directly can alter the expected output and potentially
-            // introduce security issues (see https://www.drupal.org/node/2195739). You
-            // should use renderable arrays instead.
-            // 
-            // 
-            // @see https://www.drupal.org/node/2195739
-            // $output        = theme('table', array(
-            // 					'header' => $search_header,
-            // 					'rows' => $search_rows
-            // 				));
-
-            return $output;
-          } //$search_rows
-          else {
-            echo ("Error");
-            return '';
-          }
-        }
-      }
-    } //$exist_id->id
-    else {
-      \Drupal::messenger()->addStatus('<strong>You need to propose a <a href="https://esim.fossee.in/research-migration-project/proposal">Research Migration Proposal</a></strong> or if you have already proposed then your Research Migration is under reviewing process');
-      $page_content = "<span style='color:red;'> No certificate available </span>";
-      return $page_content;
+    $rows = [];
+    foreach ($proposals as $proposal) {
+      $certificate_link = Link::fromTextAndUrl(
+        $this->t('Download Certificate'),
+        Url::fromRoute('esim_research_migration.generate_pdf', ['proposal_id' => $proposal->id])
+      )->toString();
+      $rows[] = [
+        $proposal->project_title,
+        $proposal->contributor_name,
+        Markup::create($certificate_link),
+      ];
     }
+
+    if (empty($rows)) {
+      $this->messenger()->addStatus($this->t('You need to propose a Research Migration Proposal or your Research Migration is under review.'));
+
+      return [
+        '#type' => 'markup',
+        '#markup' => Markup::create('<span style="color:red;">' . $this->t('No certificate available.') . '</span>'),
+      ];
+    }
+
+    return [
+      '#theme' => 'table',
+      '#header' => [
+        $this->t('Project Title'),
+        $this->t('Contributor Name'),
+        $this->t('Download Certificates'),
+      ],
+      '#rows' => $rows,
+      '#attributes' => ['class' => ['research-migration-certificates-table']],
+    ];
   }
 
-  public function verify_certificates($qr_code = 0) {
-    $qr_code = arg(3);
-    $page_content = "";
-    if ($qr_code) {
-      $page_content = verify_qrcode_fromdb($qr_code);
-    } //$qr_code
-    else {
-      $verify_certificates_form = drupal_get_form("verify_certificates_form");
-      $page_content = drupal_render($verify_certificates_form);
+  public function generatePdf($proposal_id) {
+    $proposal_id = (int) $proposal_id;
+    if ($proposal_id <= 0) {
+      $this->messenger()->addError($this->t('Missing proposal identifier.'));
+      return $this->redirect('esim_research_migration._list_research_migration_certificates');
     }
-    return $page_content;
+
+    $account = $this->currentUser();
+    $proposal = \Drupal::database()->select('research_migration_proposal', 'p')
+      ->fields('p')
+      ->condition('p.id', $proposal_id)
+      ->condition('p.uid', $account->id())
+      ->condition('p.approval_status', 3)
+      ->execute()
+      ->fetchObject();
+
+    if (!$proposal) {
+      $this->messenger()->addError($this->t('Certificate is not available for this proposal.'));
+      return $this->redirect('esim_research_migration._list_research_migration_certificates');
+    }
+
+    $module_path = drupal_get_path('module', 'esim_research_migration');
+    require_once $module_path . '/pdf/fpdf/fpdf.php';
+    require_once $module_path . '/pdf/phpqrcode/qrlib.php';
+
+    $site_url = rtrim(\Drupal::request()->getSchemeAndHttpHost(), '/');
+    $verify_base_url = $site_url . '/research-migration-project/certificates/verify/';
+
+    $qr_code_record = \Drupal::database()->select('research_migration_qr_code', 'q')
+      ->fields('q')
+      ->condition('q.proposal_id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+
+    $qr_string = '';
+    if ($qr_code_record && !empty($qr_code_record->qr_code) && strtolower((string) $qr_code_record->qr_code) !== 'null') {
+      $qr_string = (string) $qr_code_record->qr_code;
+    }
+    else {
+      $qr_string = substr(bin2hex(random_bytes(8)), 0, 10);
+      \Drupal::database()->merge('research_migration_qr_code')
+        ->key(['proposal_id' => $proposal_id])
+        ->fields(['qr_code' => $qr_string])
+        ->execute();
+    }
+
+    $file_system = \Drupal::service('file_system');
+    $temp_dir = $file_system->getTempDirectory();
+    $qr_png = $file_system->tempnam($temp_dir, 'rm_qr_') . '.png';
+    $pdf_file = $file_system->tempnam($temp_dir, 'rm_cert_');
+
+    $code_contents = $verify_base_url . $qr_string;
+    \QRcode::png($code_contents, $qr_png);
+
+    $pdf = new \FPDF('L', 'mm', 'Letter');
+    $pdf->AddPage();
+
+    $image_bg = $module_path . '/pdf/images/bg_cert.png';
+    if (is_file($image_bg)) {
+      $pdf->Image($image_bg, 0, 0, $pdf->GetPageWidth(), $pdf->GetPageHeight());
+    }
+
+    $pdf->SetMargins(18, 1, 18);
+    $pdf->Ln(41);
+
+    $pdf->SetFont('Times', 'I', 18);
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->Cell(0, 10, 'This is to certify that', 0, 1, 'C');
+
+    $pdf->SetFont('Times', 'I', 18);
+    $pdf->SetTextColor(37, 22, 247);
+    $pdf->Cell(0, 10, $proposal->name_title . '. ' . $proposal->contributor_name, 0, 1, 'C');
+
+    $pdf->SetFont('Times', 'I', 18);
+    $pdf->SetTextColor(0, 0, 0);
+    $institute_line = 'from ' . $proposal->institute;
+    $pdf->MultiCell(0, 10, $institute_line, 0, 'C');
+    $pdf->Cell(0, 10, 'has successfully completed the Research Migration of', 0, 1, 'C');
+
+    $title = wordwrap((string) $proposal->project_title, 60, "\n", TRUE);
+    $pdf->SetTextColor(37, 22, 247);
+    $pdf->SetFont('Times', 'I', 20);
+    $pdf->MultiCell(0, 10, $title, 0, 'C');
+
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->SetFont('Times', 'I', 18);
+    $pdf->Cell(0, 8, 'under eSim Research Migration project.', 0, 1, 'C');
+
+    $pdf->SetY(100);
+    $pdf->SetX(25);
+    if (is_file($qr_png)) {
+      $pdf->Image($qr_png, $pdf->GetX() + 15, $pdf->GetY() + 55, 30, 0);
+    }
+
+    $sign = $module_path . '/pdf/images/sign1.png';
+    if (is_file($sign)) {
+      $pdf->Image($sign, $pdf->GetX() + 85, $pdf->GetY() + 30, 75, 0);
+    }
+
+    $logo_esim = $module_path . '/pdf/images/esim-logo.png';
+    $logo_fossee = $module_path . '/pdf/images/fossee.png';
+    if (is_file($logo_esim)) {
+      $pdf->Image($logo_esim, $pdf->GetX() + 100, $pdf->GetY() + 62, 50, 0);
+    }
+    if (is_file($logo_fossee)) {
+      $pdf->Image($logo_fossee, $pdf->GetX() + 180, $pdf->GetY() + 62, 40, 0);
+    }
+
+    $pdf->SetFont('Times', 'I', 14);
+    $pdf->SetLeftMargin(40);
+    $pdf->Ln(78);
+    $pdf->Cell(0, 0, $qr_string, 0, 1, 'L');
+    $pdf->Ln(24);
+
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->SetFont('Times', 'I', 12);
+    $pdf->Cell(0, 8, 'This is computer generated certificate and requires no signature. To verify, scan the QR code or visit:', 0, 1, 'L');
+    $pdf->SetX(85);
+    $pdf->SetTextColor(0, 0, 255);
+    $pdf->Write(0, $verify_base_url, $verify_base_url);
+
+    $pdf->Output($pdf_file, 'F');
+    @unlink($qr_png);
+
+    $download_filename = str_replace(' ', '-', (string) $proposal->contributor_name) . '-esim-Research-Migration-Certificate.pdf';
+    $response = new BinaryFileResponse($pdf_file);
+    $response->setContentDisposition('attachment', $download_filename);
+    $response->deleteFileAfterSend(TRUE);
+    return $response;
+  }
+
+  public function verify_certificates($qr_code = '') {
+    $request = \Drupal::request();
+    $resolved_code = $request->query->get('qr_code');
+    $qr_code = $qr_code ?: ($resolved_code ?? '');
+
+    if (!empty($qr_code)) {
+      $qr_code = (string) $qr_code;
+      $proposal_id = \Drupal::database()->select('research_migration_qr_code', 'q')
+        ->fields('q', ['proposal_id'])
+        ->condition('q.qr_code', $qr_code)
+        ->execute()
+        ->fetchField();
+
+      if (!$proposal_id) {
+        return [
+          '#type' => 'markup',
+          '#markup' => Markup::create('<b>' . $this->t('Sorry! The QR code you entered seems to be invalid. Please try again.') . '</b>'),
+        ];
+      }
+
+      $proposal = \Drupal::database()->select('research_migration_proposal', 'p')
+        ->fields('p', ['contributor_name', 'project_title', 'project_guide_name'])
+        ->condition('p.id', (int) $proposal_id)
+        ->condition('p.approval_status', 3)
+        ->execute()
+        ->fetchObject();
+
+      if (!$proposal) {
+        return [
+          '#type' => 'markup',
+          '#markup' => Markup::create('<b>' . $this->t('Certificate details not available.') . '</b>'),
+        ];
+      }
+
+      $rows = [
+        [$this->t('Name'), $proposal->contributor_name],
+        [$this->t('Project'), $this->t('Research Migration Project')],
+        [$this->t('Research Migration completed'), $proposal->project_title],
+      ];
+      if (!empty($proposal->project_guide_name)) {
+        $rows[] = [$this->t('Project Guide'), $proposal->project_guide_name];
+      }
+
+      return [
+        '#type' => 'table',
+        '#header' => [$this->t('Field'), $this->t('Value')],
+        '#rows' => $rows,
+        '#caption' => $this->t('Participation Details'),
+      ];
+    }
+
+    return \Drupal::formBuilder()->getForm(\Drupal\esim_research_migration\Form\VerifyCertificatesForm::class);
+  }
+
+  /**
+   * Resolve an identifier from the current route or request query.
+   */
+  protected function resolveIdentifier(string $parameter = 'proposal_id'): ?int {
+    $route_match = \Drupal::routeMatch();
+    $value = $route_match->getParameter($parameter);
+    if ($value === NULL && $parameter !== 'id') {
+      $value = $route_match->getParameter('id');
+    }
+
+    if (is_object($value) && method_exists($value, 'id')) {
+      $value = $value->id();
+    }
+
+    if ($value === NULL) {
+      $request = \Drupal::request();
+      $value = $request->query->get($parameter);
+      if ($value === NULL && $parameter !== 'id') {
+        $value = $request->query->get('id');
+      }
+    }
+
+    if ($value === NULL || $value === '') {
+      return NULL;
+    }
+
+    return (int) $value;
+  }
+
+  public function downloadUploadFile() {
+    $proposal_id = $this->resolveIdentifier('proposal_id');
+    if (!$proposal_id) {
+      $this->messenger()->addError($this->t('Missing proposal identifier.'));
+      return $this->redirect('esim_research_migration.run_form');
+    }
+
+    $proposal = \Drupal::database()->select('research_migration_proposal', 'p')
+      ->fields('p')
+      ->condition('id', $proposal_id)
+      ->execute()
+      ->fetchObject();
+
+    if (!$proposal) {
+      $this->messenger()->addError($this->t('Unable to find the requested proposal.'));
+      return $this->redirect('esim_research_migration.run_form');
+    }
+
+    $relative_path = '';
+    if (!empty($proposal->user_defined_compound_filepath)) {
+      $relative_path = (string) $proposal->user_defined_compound_filepath;
+    }
+    elseif (!empty($proposal->samplefilepath)) {
+      $relative_path = (string) $proposal->samplefilepath;
+    }
+
+    if ($relative_path === '') {
+      $this->messenger()->addError($this->t('No file available for this proposal.'));
+      return $this->redirect('esim_research_migration.run_form');
+    }
+
+    $root_path = rtrim(esim_research_migration_path(), '/') . '/';
+    $file_path = $root_path . ltrim($relative_path, '/');
+
+    if (!is_file($file_path)) {
+      $this->messenger()->addError($this->t('The requested file is not available.'));
+      return $this->redirect('esim_research_migration.run_form');
+    }
+
+    $response = new BinaryFileResponse($file_path);
+    $response->setContentDisposition('attachment', basename($file_path));
+    return $response;
   }
 
 }

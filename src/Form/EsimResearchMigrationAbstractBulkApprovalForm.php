@@ -114,12 +114,10 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
   return $response;
 }
 
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $account = $this->currentUser();
     $msg = '';
-    $root_path = esim_research_migration_path();
-    //var_dump($root_path);die;
-    if ($form_state->get(['clicked_button', '#value']) == 'Submit') {
+    if (TRUE) {
       if ($form_state->getValue(['research_migration_project']))
         //var_dump($form_state['values']['research_migration_actions']);die;
         // research_migration_abstract_del_lab_pdf($form_state['values']['research_migration_project']);
@@ -132,6 +130,13 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
           $user_info = $user_query->fetchObject();
           //var_dump($user_info);die;
           $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($user_info->uid);
+          $config = \Drupal::config('esim_research_migration.settings');
+          $from = (string) ($config->get('research_migration_from_email') ?: \Drupal::config('system.site')->get('mail'));
+          $bcc = (string) $config->get('research_migration_emails');
+          $cc = (string) $config->get('research_migration_cc_emails');
+          $mail_manager = \Drupal::service('plugin.manager.mail');
+          $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
+          $site_name = (string) \Drupal::config('system.site')->get('name');
           if ($form_state->getValue(['research_migration_actions']) == 1) {
             // approving entire project //
             $query = \Drupal::database()->select('research_migration_submitted_abstracts');
@@ -142,16 +147,16 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
             $experiment_list = '';
             while ($abstract_data = $abstracts_q->fetchObject()) {
               \Drupal::database()->query("UPDATE {research_migration_submitted_abstracts} SET abstract_approval_status = 1, is_submitted = 1, approver_uid = :approver_uid WHERE id = :id", [
-                ':approver_uid' => $user->uid,
+                ':approver_uid' => $account->id(),
                 ':id' => $abstract_data->id,
               ]);
               \Drupal::database()->query("UPDATE {research_migration_submitted_abstracts_file} SET file_approval_status = 1, approvar_uid = :approver_uid WHERE submitted_abstract_id = :submitted_abstract_id", [
-                ':approver_uid' => $user->uid,
+                ':approver_uid' => $account->id(),
                 ':submitted_abstract_id' => $abstract_data->id,
               ]);
             } //$abstract_data = $abstracts_q->fetchObject()
             \Drupal::messenger()->addStatus(t('Approved Research Migration Project. Use the checkbox below to publish this Research Migration on the completed Research Migration page.'));
-            drupal_goto('research-migration-project/manage-proposal/status/' . $form_state->getValue(['research_migration_project']));
+            $form_state->setRedirect('esim_research_migration.proposal_status_form', ['proposal_id' => $form_state->getValue(['research_migration_project'])]);
             // email 
             // @FIXME
             // // @FIXME
@@ -184,7 +189,18 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
             // 					);
 
             /** sending email when everything done **/
-            $email_to = $user_data->mail;
+            $email_to = $user_data ? $user_data->getEmail() : '';
+            $email_subject = $this->t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been approved', ['!site_name' => $site_name]);
+            $email_body = [
+              $this->t('Dear @name,', ['@name' => $user_info->contributor_name]),
+              '',
+              $this->t('Your uploaded project files for the Research Migration project have been approved.'),
+              $this->t('Title of Research Migration project: @title', ['@title' => $user_info->project_title]),
+              '',
+              $this->t('Best Wishes,'),
+              $this->t('@site_name Team,', ['@site_name' => $site_name]),
+              $this->t('FOSSEE, IIT Bombay'),
+            ];
             // @FIXME
             // // @FIXME
             // // This looks like another module's variable. You'll need to rewrite this call
@@ -214,7 +230,8 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
               'Cc' => $cc,
               'Bcc' => $bcc,
             ];
-            if (!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)) {
+            $mail_result = $mail_manager->mail('esim_research_migration', 'standard', $email_to, $langcode, $params, $from, TRUE);
+            if (empty($mail_result['result'])) {
               $msg = \Drupal::messenger()->addError('Error sending email message.');
             } //!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)
           } //$form_state['values']['research_migration_actions'] == 1
@@ -227,15 +244,15 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
             $experiment_list = '';
             while ($abstract_data = $abstracts_q->fetchObject()) {
               \Drupal::database()->query("UPDATE {research_migration_submitted_abstracts} SET abstract_approval_status = 0, is_submitted = 0, approver_uid = :approver_uid WHERE id = :id", [
-                ':approver_uid' => $user->uid,
+                ':approver_uid' => $account->id(),
                 ':id' => $abstract_data->id,
               ]);
               \Drupal::database()->query("UPDATE {research_migration_proposal} SET is_submitted = 0, approver_uid = :approver_uid WHERE id = :id", [
-                ':approver_uid' => $user->uid,
+                ':approver_uid' => $account->id(),
                 ':id' => $abstract_data->proposal_id,
               ]);
               \Drupal::database()->query("UPDATE {research_migration_submitted_abstracts_file} SET file_approval_status = 0, approvar_uid = :approver_uid WHERE submitted_abstract_id = :submitted_abstract_id", [
-                ':approver_uid' => $user->uid,
+                ':approver_uid' => $account->id(),
                 ':submitted_abstract_id' => $abstract_data->id,
               ]);
             } //$abstract_data = $abstracts_q->fetchObject()
@@ -272,7 +289,19 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
             // 					);
 
             /** sending email when everything done **/
-            $email_to = $user_data->mail;
+            $email_to = $user_data ? $user_data->getEmail() : '';
+            $email_subject = $this->t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been marked for resubmission', ['!site_name' => $site_name]);
+            $email_body = [
+              $this->t('Dear @name,', ['@name' => $user_info->contributor_name]),
+              '',
+              $this->t('Your project files have been marked for resubmission. Please update your project files and resubmit.'),
+              $this->t('Project Title: @title', ['@title' => $user_info->project_title]),
+              trim((string) $form_state->getValue(['message'])) !== '' ? $this->t('Reason for resubmission: @reason', ['@reason' => $form_state->getValue(['message'])]) : '',
+              '',
+              $this->t('Best Wishes,'),
+              $this->t('@site_name Team,', ['@site_name' => $site_name]),
+              $this->t('FOSSEE, IIT Bombay'),
+            ];
             // @FIXME
             // // @FIXME
             // // This looks like another module's variable. You'll need to rewrite this call
@@ -302,7 +331,8 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
               'Cc' => $cc,
               'Bcc' => $bcc,
             ];
-            if (!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)) {
+            $mail_result = $mail_manager->mail('esim_research_migration', 'standard', $email_to, $langcode, $params, $from, TRUE);
+            if (empty($mail_result['result'])) {
               \Drupal::messenger()->addError('Error sending email message.');
             } //!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)
           } //$form_state['values']['research_migration_actions'] == 2
@@ -313,7 +343,7 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
               $msg = \Drupal::messenger()->addError("Please mention the reason for disapproval. Minimum 30 character required");
               return $msg;
             } //strlen(trim($form_state['values']['message'])) <= 30
-            if (!\Drupal::currentUser()->hasPermission('Research Migration bulk delete abstract')) {
+            if (!$account->hasPermission('Research Migration bulk delete abstract')) {
               $msg = \Drupal::messenger()->addError(t('You do not have permission to Bulk Dis-Approved and Deleted Entire Lab.'));
               return $msg;
             } //!user_access('research_migration bulk delete code')
@@ -349,7 +379,19 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
               // 											))
               // 					);
 
-              $email_to = $user_data->mail;
+              $email_to = $user_data ? $user_data->getEmail() : '';
+              $email_subject = $this->t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been disapproved', ['!site_name' => $site_name]);
+              $email_body = [
+                $this->t('Dear @name,', ['@name' => $user_info->contributor_name]),
+                '',
+                $this->t('We regret to inform you that the project files submitted for the Research Migration project have been disapproved by the reviewer.'),
+                $this->t('Project Title: @title', ['@title' => $user_info->project_title]),
+                $this->t('Reason for disapproval: @reason', ['@reason' => $form_state->getValue(['message'])]),
+                '',
+                $this->t('Best Wishes,'),
+                $this->t('@site_name Team,', ['@site_name' => $site_name]),
+                $this->t('FOSSEE, IIT Bombay'),
+              ];
               // @FIXME
               // // @FIXME
               // // This looks like another module's variable. You'll need to rewrite this call
@@ -379,7 +421,8 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
                 'Cc' => $cc,
                 'Bcc' => $bcc,
               ];
-              if (!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)) {
+              $mail_result = $mail_manager->mail('esim_research_migration', 'standard', $email_to, $langcode, $params, $from, TRUE);
+              if (empty($mail_result['result'])) {
                 \Drupal::messenger()->addError('Error sending email message.');
               }
             } //research_migration_abstract_delete_project($form_state['values']['research_migration_project'])
@@ -484,4 +527,3 @@ function _bulk_list_research_migration_actions(): array {
     // 4 => 'Delete Entire Research Migration Project Including Proposal', // if needed
   ];
 }
-?>

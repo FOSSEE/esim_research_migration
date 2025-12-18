@@ -25,18 +25,6 @@ esim_research_migration.proposal_edit_file_all:
   title: 'Edit code files'
   weight: 4
   description: 'Edit code files'
-esim_research_migration.proposal_approval_form:
-  route_name: esim_research_migration.proposal_approval_form
-  title: 'Approve Proposal'
-  description: 'Approve Proposal'
-esim_research_migration.proposal_edit_form:
-  route_name: esim_research_migration.proposal_edit_form
-  title: 'Edit Proposal'
-  description: 'Edit Proposal'
-esim_research_migration.proposal_status_form:
-  route_name: esim_research_migration.proposal_status_form
-  title: 'Proposal Status'
-  description: 'Proposal Status'
 esim_research_migration.abstract_bulk_approval_form:
   route_name: esim_research_migration.abstract_bulk_approval_form
   title: 'Research Migration Manage Code'
@@ -63,10 +51,6 @@ esim_research_migration.upload_code_delete:
   title: 'Delete Solution'
   description: 'Delete Solution'
   parent: esim_research_migration.abstract
-esim_research_migration.download_full_project:
-  route_name: esim_research_migration.download_full_project
-  title: 'Code Download'
-  description: 'Code Download'
 esim_research_migration.completed_proposals_all:
   route_name: esim_research_migration.completed_proposals_all
   title: 'Completed Research Migration'
@@ -83,14 +67,6 @@ esim_research_migration.download_upload_file:
   route_name: esim_research_migration.download_upload_file
   title: 'Download user defined compound file'
   description: 'Download resource file'
-esim_research_migration.download_research_migration_project_title_files:
-  route_name: esim_research_migration.download_research_migration_project_title_files
-  title: 'Download Project Title file'
-  description: 'Download Project Title file'
-esim_research_migration.project_files:
-  route_name: esim_research_migration.project_files
-  title: 'Download Project file'
-  description: 'Download project file'
 esim_research_migration.settings_form:
   route_name: esim_research_migration.settings_form
   title: 'Research Migration Settings'
@@ -101,11 +77,6 @@ esim_research_migration._list_research_migration_certificates:
   route_name: esim_research_migration._list_research_migration_certificates
   title: 'List of Research Migration Project Certificates'
   description: 'List of Research Migration Project Certificates'
-esim_research_migration.generate_pdf:
-  route_name: esim_research_migration.generate_pdf
-  title: 'Download Certificate'
-  description: 'Download Certificate'
-  parent: esim_research_migration._list_research_migration_certificates
 esim_research_migration.verify_certificates_verify_certificates:
   route_name: esim_research_migration.verify_certificates_verify_certificates
   title: 'Certificate Verification'

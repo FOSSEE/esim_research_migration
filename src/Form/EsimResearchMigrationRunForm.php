@@ -28,7 +28,7 @@ class EsimResearchMigrationRunForm extends FormBase {
 public function buildForm(array $form, FormStateInterface $form_state) {
   $options_first = _list_of_research_migration();
   $route_match = \Drupal::routeMatch();
-  $url_research_migration_id = (int) $route_match->getParameter('arg_2');
+  $url_research_migration_id = (int) $route_match->getParameter('proposal_id');
 
   $research_migration_data = _research_migration_information($url_research_migration_id);
   if ($research_migration_data === 'Not found') {

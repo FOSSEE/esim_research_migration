@@ -9,7 +9,6 @@ namespace Drupal\esim_research_migration\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
 
 class AddProjectTitleForm extends FormBase {
 
@@ -20,14 +19,16 @@ class AddProjectTitleForm extends FormBase {
     return 'add_project_title_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
-    /************************ start approve book details ************************/
-    if ($user->uid == 0) {
-      $msg = \Drupal::messenger()->addError(t('It is mandatory to ' . \Drupal\Core\Link::fromTextAndUrl('login', \Drupal\Core\Url::fromRoute('user.page')) . ' on this website to access the research migration proposal form. If you are new user please create a new account first.'));
-      drupal_goto('user');
-      return $msg;
-    } //$user->uid == 0
+  public function buildForm(array $form, FormStateInterface $form_state) {
+    $account = $this->currentUser();
+    if (!$account->isAuthenticated()) {
+      $login_link = \Drupal\Core\Link::fromTextAndUrl($this->t('login'), \Drupal\Core\Url::fromRoute('user.login'))->toString();
+      $this->messenger()->addError($this->t('It is mandatory to @login_link on this website to access this form. If you are a new user please create a new account first.', [
+        '@login_link' => $login_link,
+      ]));
+      $form_state->setRedirect('user.login');
+      return [];
+    }
     $form['#attributes'] = [
       'enctype' => "multipart/form-data"
       ];
@@ -69,43 +70,38 @@ class AddProjectTitleForm extends FormBase {
     return $form;
   }
 
-  public function validateForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    if (isset($_FILES['files'])) {
-      /* check if atleast one source or result file is uploaded */
-      if (!($_FILES['files']['name']['project_title_resource_file_path'])) {
-        $form_state->setErrorByName('project_title_resource_file_path', t('Please upload the file'));
-      }
-      /* check for valid filename extensions */
-      foreach ($_FILES['files']['name'] as $file_form_name => $file_name) {
-        if ($file_name) {
-          /* checking file type */
-          // @FIXME
-// // @FIXME
-// // This looks like another module's variable. You'll need to rewrite this call
-// // to ensure that it uses the correct configuration object.
-// $allowed_extensions_str = variable_get('list_of_available_projects_file', '');
-
-          $allowed_extensions = explode(',', $allowed_extensions_str);
-          $fnames = explode('.', strtolower($_FILES['files']['name'][$file_form_name]));
-          $temp_extension = end($fnames);
-          if (!in_array($temp_extension, $allowed_extensions)) {
-            $form_state->setErrorByName($file_form_name, t('Only file with ' . $allowed_extensions_str . ' extensions can be uploaded.'));
-          }
-          if ($_FILES['files']['size'][$file_form_name] <= 0) {
-            $form_state->setErrorByName($file_form_name, t('File size cannot be zero.'));
-          }
-          /* check if valid file name */
-          if (!esim_research_migration_check_valid_filename($_FILES['files']['name'][$file_form_name])) {
-            $form_state->setErrorByName($file_form_name, t('Invalid file name specified. Only alphabets and numbers are allowed as a valid filename.'));
-          }
-        } //$file_name
-      } //$_FILES['files']['name'] as $file_form_name => $file_name
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    if (!isset($_FILES['files']['name']) || !is_array($_FILES['files']['name'])) {
+      return;
     }
-    return $form_state;
+
+    $allowed_extensions_str = (string) \Drupal::config('esim_research_migration.settings')->get('list_of_available_projects_file');
+    $allowed_extensions = array_filter(array_map('trim', explode(',', $allowed_extensions_str)));
+
+    foreach ($_FILES['files']['name'] as $file_form_name => $file_name) {
+      if (!$file_name) {
+        continue;
+      }
+
+      if ($allowed_extensions && !empty($allowed_extensions_str)) {
+        $fnames = explode('.', strtolower((string) $file_name));
+        $temp_extension = end($fnames);
+        if (!in_array($temp_extension, $allowed_extensions, TRUE)) {
+          $form_state->setErrorByName($file_form_name, t('Only file with @ext extensions can be uploaded.', ['@ext' => $allowed_extensions_str]));
+        }
+      }
+
+      if (!empty($_FILES['files']['size'][$file_form_name]) && $_FILES['files']['size'][$file_form_name] <= 0) {
+        $form_state->setErrorByName($file_form_name, t('File size cannot be zero.'));
+      }
+
+      if (!esim_research_migration_check_valid_filename((string) $file_name)) {
+        $form_state->setErrorByName($file_form_name, t('Invalid file name specified. Only alphabets and numbers are allowed as a valid filename.'));
+      }
+    }
   }
 
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
+  public function submitForm(array &$form, FormStateInterface $form_state) {
     $v = $form_state->getValues();
     $result = "INSERT INTO {rm_list_of_project_titles}
 	(
@@ -123,6 +119,11 @@ class AddProjectTitleForm extends FormBase {
     $result1 = \Drupal::database()->query($result, $args, $result);
     $dest_path = esim_research_migration_project_titles_resource_file_path();
     //var_dump($dest_path);die;
+    if (!isset($_FILES['files']['name']) || !is_array($_FILES['files']['name'])) {
+      \Drupal::messenger()->addStatus(t('Project title added successfully.'));
+      return;
+    }
+
     foreach ($_FILES['files']['name'] as $file_form_name => $file_name) {
       if ($file_name) {
         /* checking file type */
@@ -155,4 +156,3 @@ class AddProjectTitleForm extends FormBase {
   }
 
 }
-?>

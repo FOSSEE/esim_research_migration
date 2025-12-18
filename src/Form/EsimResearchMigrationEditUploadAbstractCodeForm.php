@@ -20,12 +20,10 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
     return 'esim_research_migration_edit_upload_abstract_code_form';
   }
 
-  public function buildForm(array $form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
+  public function buildForm(array $form, FormStateInterface $form_state) {
     $form['#attributes'] = ['enctype' => "multipart/form-data"];
     /* get current proposal */
-    $proposal_id = (int) arg(3);
-    $uid = $user->uid;
+    $proposal_id = (int) \Drupal::request()->query->get('proposal_id');
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
     $query->condition('id', $proposal_id);
@@ -36,14 +34,14 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
       } //$proposal_data = $proposal_q->fetchObject()
       else {
         \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-        drupal_goto('research-migration-project/manage-proposal/edit-upload-file');
-        return;
+        $form_state->setRedirect('esim_research_migration.proposal_edit_file_all');
+        return [];
       }
     } //$proposal_q
     else {
       \Drupal::messenger()->addError(t('Invalid proposal selected. Please try again.'));
-      drupal_goto('research-migration-project/manage-proposal/edit-upload-file');
-      return;
+      $form_state->setRedirect('esim_research_migration.proposal_edit_file_all');
+      return [];
     }
     $query = \Drupal::database()->select('research_migration_submitted_abstracts');
     $query->fields('research_migration_submitted_abstracts');
@@ -64,32 +62,26 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
       $existing_uploaded_A_file = new stdClass();
       $existing_uploaded_A_file->filename = "No file uploaded";
     } //!$existing_uploaded_A_file
-    // @FIXME
-    // // @FIXME
-    // // This looks like another module's variable. You'll need to rewrite this call
-    // // to ensure that it uses the correct configuration object.
-    // $form['upload_research_migration_abstract'] = array(
-    //         '#type' => 'file',
-    //         '#title' => t('Upload the Synopsis'),
-    //         //'#required' => TRUE,
-    //         '#description' => t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_A_file->filename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.') . '<br />' . t('<span style="color:red;">Allowed file extensions : ') . variable_get('resource_upload_extensions', '') . '</span>',
-    //     );
+    $config = \Drupal::config('esim_research_migration.settings');
+    $synopsis_extensions = (string) $config->get('resource_upload_extensions');
+    $project_extensions = (string) $config->get('research_migration_project_files_extensions');
+
+    $form['upload_research_migration_abstract'] = [
+      '#type' => 'file',
+      '#title' => t('Upload the Synopsis'),
+      '#description' => t('Current File: @file', ['@file' => $existing_uploaded_A_file->filename]) . '<br />' . t('Allowed file extensions: @ext', ['@ext' => $synopsis_extensions]),
+    ];
 
     $existing_uploaded_S_file = default_value_for_uploaded_files("S", $proposal_data->id);
     if (!$existing_uploaded_S_file) {
       $existing_uploaded_S_file = new stdClass();
       $existing_uploaded_S_file->filename = "No file uploaded";
     } //!$existing_uploaded_S_file
-    // @FIXME
-    // // @FIXME
-    // // This looks like another module's variable. You'll need to rewrite this call
-    // // to ensure that it uses the correct configuration object.
-    // $form['upload_research_migration_developed_process'] = array(
-    //         '#type' => 'file',
-    //         '#title' => t('Upload the Case Directory'),
-    //         //'#required' => TRUE,
-    //         '#description' => t('<span style="color:red;">Current File :</span> ' . $existing_uploaded_S_file->filename . '<br />Separate filenames with underscore. No spaces or any special characters allowed in filename.') . '<br />' . t('<span style="color:red;">Allowed file extensions : ') . variable_get('research_migration_project_files_extensions', '') . '</span>',
-    //     );
+    $form['upload_research_migration_developed_process'] = [
+      '#type' => 'file',
+      '#title' => t('Upload the Case Directory'),
+      '#description' => t('Current File: @file', ['@file' => $existing_uploaded_S_file->filename]) . '<br />' . t('Allowed file extensions: @ext', ['@ext' => $project_extensions]),
+    ];
 
     $form['prop_id'] = [
       '#type' => 'hidden',
@@ -112,7 +104,7 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
     return $form;
   }
 
-  public function validateForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
+  public function validateForm(array &$form, FormStateInterface $form_state) {
 
     if (!($_FILES['files']['name']['upload_research_migration_abstract'] || $_FILES['files']['name']['upload_research_migration_developed_process'])) {
       \Drupal::messenger()->addError('No files uploaded');
@@ -138,19 +130,11 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
           $allowed_extensions_str = '';
           switch ($file_type) {
             case 'A':
-              // @FIXME
-              // // @FIXME
-              // // This looks like another module's variable. You'll need to rewrite this call
-              // // to ensure that it uses the correct configuration object.
-              // $allowed_extensions_str = variable_get('resource_upload_extensions', '');
+              $allowed_extensions_str = (string) \Drupal::config('esim_research_migration.settings')->get('resource_upload_extensions');
 
               break;
             case 'S':
-              // @FIXME
-              // // @FIXME
-              // // This looks like another module's variable. You'll need to rewrite this call
-              // // to ensure that it uses the correct configuration object.
-              // $allowed_extensions_str = variable_get('research_migration_project_files_extensions', '');
+              $allowed_extensions_str = (string) \Drupal::config('esim_research_migration.settings')->get('research_migration_project_files_extensions');
 
               break;
           } //$file_type
@@ -181,8 +165,10 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
 
   }
 
-  public function submitForm(array &$form, \Drupal\Core\Form\FormStateInterface $form_state) {
-    $user = \Drupal::currentUser();
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $account = $this->currentUser();
+    /** @var \Drupal\user\UserInterface|null $user */
+    $user = \Drupal::entityTypeManager()->getStorage('user')->load($account->id());
     $v = $form_state->getValues();
     $root_path = esim_research_migration_path();
     $query = \Drupal::database()->select('research_migration_proposal');
@@ -192,7 +178,7 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
     $proposal_data = $proposal_q->fetchObject();
     $proposal_id = $proposal_data->id;
     if (!$proposal_data) {
-      drupal_goto('');
+      $form_state->setRedirect('esim_research_migration.proposal_edit_file_all');
       return;
     } //!$proposal_data
     $proposal_id = $proposal_data->id;
@@ -232,7 +218,7 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
           $query = "UPDATE {research_migration_submitted_abstracts_file} SET filename = :filename, filepath=:filepath, filemime=:filemime, filesize=:filesize, timestamp=:timestamp WHERE proposal_id = :proposal_id AND filetype = :filetype";
           $args = [
             ":filename" => $_FILES['files']['name'][$file_form_name],
-            ":filepath" => $file_path . $_FILES['files']['name'][$file_form_name],
+            ":filepath" => $_FILES['files']['name'][$file_form_name],
             ":filemime" => mime_content_type($root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name]),
             ":filesize" => $_FILES['files']['size'][$file_form_name],
             ":timestamp" => time(),
@@ -250,27 +236,14 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
       }
     } //$_FILES['files']['name'] as $file_form_name => $file_name
     /* sending email */
-    $email_to = $user->mail;
-    // @FIXME
-    // // @FIXME
-    // // This looks like another module's variable. You'll need to rewrite this call
-    // // to ensure that it uses the correct configuration object.
-    // $from = variable_get('research_migration_from_email', '');
-
-    // @FIXME
-    // // @FIXME
-    // // This looks like another module's variable. You'll need to rewrite this call
-    // // to ensure that it uses the correct configuration object.
-    // $bcc = variable_get('research_migration_emails', '');
-
-    // @FIXME
-    // // @FIXME
-    // // This looks like another module's variable. You'll need to rewrite this call
-    // // to ensure that it uses the correct configuration object.
-    // $cc = variable_get('research_migration_cc_emails', '');
+    $email_to = $user ? $user->getEmail() : '';
+    $config = \Drupal::config('esim_research_migration.settings');
+    $from = (string) ($config->get('research_migration_from_email') ?: \Drupal::config('system.site')->get('mail'));
+    $bcc = (string) $config->get('research_migration_emails');
+    $cc = (string) $config->get('research_migration_cc_emails');
 
     $params['abstract_edit_file_uploaded']['proposal_id'] = $proposal_id;
-    $params['abstract_edit_file_uploaded']['user_id'] = $user->uid;
+    $params['abstract_edit_file_uploaded']['user_id'] = $account->id();
     $params['abstract_edit_file_uploaded']['abs_file'] = $abs_file_name;
     $params['abstract_edit_file_uploaded']['proj_file'] = $proj_file_name;
     $params['abstract_edit_file_uploaded']['headers'] = [
@@ -282,11 +255,13 @@ class EsimResearchMigrationEditUploadAbstractCodeForm extends FormBase {
       'Cc' => $cc,
       'Bcc' => $bcc,
     ];
-    if (!drupal_mail('research_migration', 'abstract_edit_file_uploaded', $email_to, language_default(), $params, $from, TRUE)) {
-      \Drupal::messenger()->addError('Error sending email message.');
+    $mail_manager = \Drupal::service('plugin.manager.mail');
+    $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
+    $mail_result = $mail_manager->mail('esim_research_migration', 'abstract_edit_file_uploaded', $email_to, $langcode, $params, $from, TRUE);
+    if (empty($mail_result['result'])) {
+      $this->messenger()->addError($this->t('Error sending email message.'));
     }
-    drupal_goto('research-migration-project/abstract-code/edit-upload-files');
+    $form_state->setRedirect('esim_research_migration.edit_upload_abstract_code_form', [], ['query' => ['proposal_id' => $proposal_id]]);
   }
 
 }
-?>

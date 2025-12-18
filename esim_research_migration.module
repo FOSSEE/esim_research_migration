@@ -16,11 +16,8 @@ use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Render\Markup;
 // $Id$
-error_reporting(E_ALL);
-ini_set('display_errors', TRUE);
-ini_set('display_startup_errors', TRUE);
-require_once 'general_deletion.inc';
-require_once 'email.inc';
+require_once __DIR__ . '/general_deletion.inc';
+require_once __DIR__ . '/email.inc';
 /**
  * Implementation of hook_menu().
  */
@@ -538,16 +535,14 @@ function esim_research_migration_get_proposal()
     $user = \Drupal::currentUser();
     $query = \Drupal::database()->select('research_migration_proposal');
     $query->fields('research_migration_proposal');
-    $query->condition('uid', $user->uid);
+    $query->condition('uid', $user->id());
     $query->orderBy('id', 'DESC');
     $query->range(0, 1);
     $proposal_q = $query->execute();
     $proposal_data = $proposal_q->fetchObject();
     if (!$proposal_data) {
         \Drupal::messenger()->addError("You do not have any approved  Research Migration proposal. Please propose a Research Migration");
-       $response = new RedirectResponse(Url::fromRoute('<front>')->toString());
-      // Send the redirect response
-      $response->send();
+        return FALSE;
     } //!$proposal_data
     switch ($proposal_data->approval_status) {
         case 0:
@@ -773,6 +768,10 @@ function _rm_rrmdir_project($prop_id)
         ":proposal_id" => $proposal_id,
     ));
     $proposal_data = $result->fetchObject();
+    if (!$proposal_data) {
+        \Drupal::messenger()->addError("Data not found");
+        return FALSE;
+    }
     $root_path = esim_research_migration_document_path();
     $dir = $root_path . $proposal_data->directory_name;
     if ($proposal_data->id == $prop_id) {
@@ -781,7 +780,7 @@ function _rm_rrmdir_project($prop_id)
             foreach ($objects as $object) {
                 if ($object != "." && $object != "..") {
                     if (filetype($dir . "/" . $object) == "dir") {
-                        rrmdir($dir . "/" . $object);
+                        _rm_rrmdir($dir . "/" . $object);
                     } //filetype($dir . "/" . $object) == "dir"
                     else {
                         unlink($dir . "/" . $object);
@@ -790,15 +789,15 @@ function _rm_rrmdir_project($prop_id)
             } //$objects as $object
             reset($objects);
             rmdir($dir);
-            $msg = \Drupal::messenger()->addMessage("Directory deleted successfully");
-            return $msg;
+            \Drupal::messenger()->addStatus("Directory deleted successfully");
+            return TRUE;
         } //is_dir($dir)
-        $msg = \Drupal::messenger()->addMessage("Directory not present");
-        return $msg;
+        \Drupal::messenger()->addError("Directory not present");
+        return FALSE;
     } //$proposal_data->id == $prop_id
     else {
-        $msg = \Drupal::messenger()->addMessage("Data not found");
-        return $msg;
+        \Drupal::messenger()->addError("Data not found");
+        return FALSE;
     }
 }
 function _rm_rrmdir($dir)
@@ -808,7 +807,7 @@ function _rm_rrmdir($dir)
         foreach ($objects as $object) {
             if ($object != "." && $object != "..") {
                 if (filetype($dir . "/" . $object) == "dir") {
-                    rrmdir($dir . "/" . $object);
+                    _rm_rrmdir($dir . "/" . $object);
                 } else {
                     unlink($dir . "/" . $object);
                 }
@@ -1121,218 +1120,169 @@ function edit_lecture_videos_form_submit($form, &$form_state) {
 /**
  * Implements hook_mail().
  */
-function research_migration_mail($key, &$message, $params) {
-    $user = \Drupal::currentUser();
-    $language = $message['language'];
-    // Get language properly for the current user.
-    $language = $user->getPreferredLangcode();
-    
+function esim_research_migration_mail($key, &$message, $params) {
+    $site_name = (string) \Drupal::config('system.site')->get('name');
+    $message['body'] = $message['body'] ?? [];
+
     switch ($key) {
-        case 'research_migration_proposal_received':
-            // Initialize data
-            $query = \Drupal::database()->select('research_migration_proposal');
-            $query->fields('research_migration_proposal');
-            $query->condition('id', $params['research_migration_proposal_received']['result1']);
-            $query->range(0, 1);
-            $proposal_data = $query->execute()->fetchObject();
-            $user = \Drupal::entityTypeManager()->getStorage('user')->load($params['research_migration_proposal_received']['user_id']);
-            $message['headers'] = $params['research_migration_proposal_received']['headers'];
-            
-            // Fetch site name from configuration instead of variable_get
-            $site_name = \Drupal::config('system.site')->get('name');
+        case 'research_migration_proposal_received': {
+            $proposal_id = $params['research_migration_proposal_received']['result1'] ?? NULL;
+            $user_id = $params['research_migration_proposal_received']['user_id'] ?? NULL;
+            $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
+            $user = $user_id ? \Drupal::entityTypeManager()->getStorage('user')->load($user_id) : NULL;
+            $message['headers'] = $params['research_migration_proposal_received']['headers'] ?? [];
             $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been received', ['!site_name' => $site_name]);
-            
-            $message['body'] = [
-                'body' => t('
-                    Dear @contributor_name,
-
-                    We have received your Research Migration Project proposal with the following details:
-
-                    Full Name: @full_name
-                    Email: @email
-                    University/Institute: @university
-                    City: @city
-                    State: @state
-                    Country: @country
-                    Project Title: @project_title
-                    Date of Proposal: @date_of_proposal
-                    Expected Date of Completion: @expected_date
-
-                    Your proposal is under review. You will soon receive an email when it has been approved or disapproved.
-
-                    Best Wishes,
-
-                    @site_name Team,
-                    FOSSEE, IIT Bombay',
-                [
-                    '@contributor_name' => $proposal_data->contributor_name,
-                    '@full_name' => $proposal_data->name_title . ' ' . $proposal_data->contributor_name,
-                    '@email' => $user->getEmail(),
-                    '@university' => $proposal_data->university,
-                    '@city' => $proposal_data->city,
-                    '@state' => $proposal_data->state,
-                    '@country' => $proposal_data->country,
-                    '@project_title' => $proposal_data->project_title,
-                    '@date_of_proposal' => date('d/m/Y', $proposal_data->creation_date),
-                    '@expected_date' => date('d/m/Y', $proposal_data->expected_date_of_completion),
-                    '@site_name' => $site_name,
-                ], ['language' => $language]),
-            ];
+            if ($proposal_data && $user) {
+                $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
+                $message['body'][] = '';
+                $message['body'][] = t('We have received your Research Migration Project proposal with the following details:');
+                $message['body'][] = t('Full Name: @full_name', ['@full_name' => $proposal_data->name_title . ' ' . $proposal_data->contributor_name]);
+                $message['body'][] = t('Email: @email', ['@email' => $user->getEmail()]);
+                $message['body'][] = t('University/Institute: @university', ['@university' => $proposal_data->university]);
+                $message['body'][] = t('City: @city', ['@city' => $proposal_data->city]);
+                $message['body'][] = t('State: @state', ['@state' => $proposal_data->state]);
+                $message['body'][] = t('Country: @country', ['@country' => $proposal_data->country]);
+                $message['body'][] = t('Project Title: @title', ['@title' => $proposal_data->project_title]);
+                $message['body'][] = t('Date of Proposal: @date', ['@date' => date('d/m/Y', $proposal_data->creation_date)]);
+                $message['body'][] = t('Expected Date of Completion: @date', ['@date' => date('d/m/Y', $proposal_data->expected_date_of_completion)]);
+                $message['body'][] = '';
+                $message['body'][] = t('Your proposal is under review. You will soon receive an email when it has been approved or disapproved.');
+                $message['body'][] = '';
+                $message['body'][] = t('Best Wishes,');
+                $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+                $message['body'][] = t('FOSSEE, IIT Bombay');
+            }
             break;
+        }
 
-        case 'research_migration_proposal_disapproved':
-            // Initialize data
-            $query = \Drupal::database()->select('research_migration_proposal');
-            $query->fields('research_migration_proposal');
-            $query->condition('id', $params['research_migration_proposal_disapproved']['proposal_id']);
-            $query->range(0, 1);
-            $proposal_data = $query->execute()->fetchObject();
-            $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($params['research_migration_proposal_disapproved']['user_id']);
-            $message['headers'] = $params['research_migration_proposal_disapproved']['headers'];
-
-            // Fetch site name from configuration instead of variable_get
-            $site_name = \Drupal::config('system.site')->get('name');
-            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been disapproved', ['!site_name' => $site_name]);
-            
-            $message['body'] = [
-                'body' => t('
-                    Dear @contributor_name,
-
-                    We regret to inform you that your Research Migration proposal with the following details has been disapproved:
-
-                    Full Name: @full_name
-                    Email: @email
-                    University/Institute: @university
-                    City: @city
-                    State: @state
-                    Country: @country
-                    Project Title: @project_title
-                    Date of Proposal: @date_of_proposal
-                    Expected Date of Completion: @expected_date
-
-                    Reason for rejection: @reason
-
-                    You are welcome to submit a new proposal.
-
-                    Best Wishes,
-
-                    @site_name Team,
-                    FOSSEE, IIT Bombay',
-                [
-                    '@contributor_name' => $proposal_data->contributor_name,
-                    '@full_name' => $proposal_data->name_title . ' ' . $proposal_data->contributor_name,
-                    '@email' => $user_data->getEmail(),
-                    '@university' => $proposal_data->university,
-                    '@city' => $proposal_data->city,
-                    '@state' => $proposal_data->state,
-                    '@country' => $proposal_data->country,
-                    '@project_title' => $proposal_data->project_title,
-                    '@date_of_proposal' => date('d/m/Y', $proposal_data->creation_date),
-                    '@expected_date' => date('d/m/Y', $proposal_data->expected_date_of_completion),
-                    '@reason' => $proposal_data->dissapproval_reason,
-                    '@site_name' => $site_name,
-                ], ['language' => $language]),
-            ];
-            break;
-
-        case 'research_migration_proposal_approved':
-            // Initialize data
-            $url = 'http://esim.fossee.in/research-migration-project/abstract-code';
-            $query = \Drupal::database()->select('research_migration_proposal');
-            $query->fields('research_migration_proposal');
-            $query->condition('id', $params['research_migration_proposal_approved']['proposal_id']);
-            $query->range(0, 1);
-            $proposal_data = $query->execute()->fetchObject();
-            $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($params['research_migration_proposal_approved']['user_id']);
-            $message['headers'] = $params['research_migration_proposal_approved']['headers'];
-
-            // Fetch site name from configuration instead of variable_get
-            $site_name = \Drupal::config('system.site')->get('name');
+        case 'research_migration_proposal_approved': {
+            $proposal_id = $params['research_migration_proposal_approved']['proposal_id'] ?? NULL;
+            $user_id = $params['research_migration_proposal_approved']['user_id'] ?? NULL;
+            $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
+            $user = $user_id ? \Drupal::entityTypeManager()->getStorage('user')->load($user_id) : NULL;
+            $message['headers'] = $params['research_migration_proposal_approved']['headers'] ?? [];
             $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been approved', ['!site_name' => $site_name]);
-            
-            $message['body'] = [
-                'body' => t('
-                    Dear @contributor_name,
-
-                    Your Research Migration Project proposal with the following details has been approved:
-
-                    Full Name: @full_name
-                    Email: @email
-                    University/Institute: @university
-                    City: @city
-                    State: @state
-                    Country: @country
-                    Project Title: @project_title
-                    Date of Proposal: @date_of_proposal
-                    Expected Date of Completion: @expected_date
-
-                    You can upload your project files at: @url
-
-                    Best Wishes,
-
-                    @site_name Team,
-                    FOSSEE, IIT Bombay',
-                [
-                    '@contributor_name' => $proposal_data->contributor_name,
-                    '@full_name' => $proposal_data->name_title . ' ' . $proposal_data->contributor_name,
-                    '@email' => $user_data->getEmail(),
-                    '@university' => $proposal_data->university,
-                    '@city' => $proposal_data->city,
-                    '@state' => $proposal_data->state,
-                    '@country' => $proposal_data->country,
-                    '@project_title' => $proposal_data->project_title,
-                    '@date_of_proposal' => date('d/m/Y', $proposal_data->creation_date),
-                    '@expected_date' => date('d/m/Y', $proposal_data->expected_date_of_completion),
-                    '@url' => $url,
-                    '@site_name' => $site_name,
-                ], ['language' => $language]),
-            ];
+            $url = \Drupal::request()->getSchemeAndHttpHost() . '/research-migration-project/abstract-code';
+            if ($proposal_data && $user) {
+                $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
+                $message['body'][] = '';
+                $message['body'][] = t('Your Research Migration Project proposal has been approved.');
+                $message['body'][] = t('Project Title: @title', ['@title' => $proposal_data->project_title]);
+                $message['body'][] = '';
+                $message['body'][] = t('You can upload your project files at: @url', ['@url' => $url]);
+                $message['body'][] = '';
+                $message['body'][] = t('Best Wishes,');
+                $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+                $message['body'][] = t('FOSSEE, IIT Bombay');
+            }
             break;
+        }
 
-        case 'research_migration_proposal_completed':
-            // Initialize data
-            $query = \Drupal::database()->select('research_migration_proposal');
-            $query->fields('research_migration_proposal');
-            $query->condition('id', $params['research_migration_proposal_completed']['proposal_id']);
-            $query->range(0, 1);
-            $proposal_data = $query->execute()->fetchObject();
-            $user_data = \Drupal::entityTypeManager()->getStorage('user')->load($params['research_migration_proposal_completed']['user_id']);
-            $message['headers'] = $params['research_migration_proposal_completed']['headers'];
-
-            // Fetch site name from configuration instead of variable_get
-            $site_name = \Drupal::config('system.site')->get('name');
-            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been completed', ['!site_name' => $site_name]);
-
-            $message['body'] = [
-                'body' => t('
-                    Dear @contributor_name,
-
-                    Your Research Migration Project and Synopsis on the following process have been completed successfully:
-
-                    Full Name: @full_name
-                    Email: @email
-                    University/Institute: @university
-                    City: @city
-                    State: @state
-                    Country: @country
-                    Project Title: @project_title
-
-                    Best Wishes,
-
-                    @site_name Team,
-                    FOSSEE, IIT Bombay',
-                [
-                    '@contributor_name' => $proposal_data->contributor_name,
-                    '@full_name' => $proposal_data->name_title . ' ' . $proposal_data->contributor_name,
-                    '@email' => $user_data->getEmail(),
-                    '@university' => $proposal_data->university,
-                    '@city' => $proposal_data->city,
-                    '@state' => $proposal_data->state,
-                    '@country' => $proposal_data->country,
-                    '@project_title' => $proposal_data->project_title,
-                    '@site_name' => $site_name,
-                ], ['language' => $language]),
-            ];
+        case 'research_migration_proposal_disapproved': {
+            $proposal_id = $params['research_migration_proposal_disapproved']['proposal_id'] ?? NULL;
+            $user_id = $params['research_migration_proposal_disapproved']['user_id'] ?? NULL;
+            $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
+            $user = $user_id ? \Drupal::entityTypeManager()->getStorage('user')->load($user_id) : NULL;
+            $message['headers'] = $params['research_migration_proposal_disapproved']['headers'] ?? [];
+            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been disapproved', ['!site_name' => $site_name]);
+            if ($proposal_data && $user) {
+                $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
+                $message['body'][] = '';
+                $message['body'][] = t('We regret to inform you that your Research Migration Project proposal has been disapproved.');
+                $message['body'][] = t('Project Title: @title', ['@title' => $proposal_data->project_title]);
+                if (!empty($proposal_data->dissapproval_reason)) {
+                    $message['body'][] = t('Reason for rejection: @reason', ['@reason' => $proposal_data->dissapproval_reason]);
+                }
+                $message['body'][] = '';
+                $message['body'][] = t('You are welcome to submit a new proposal.');
+                $message['body'][] = '';
+                $message['body'][] = t('Best Wishes,');
+                $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+                $message['body'][] = t('FOSSEE, IIT Bombay');
+            }
             break;
+        }
+
+        case 'research_migration_proposal_completed': {
+            $proposal_id = $params['research_migration_proposal_completed']['proposal_id'] ?? NULL;
+            $user_id = $params['research_migration_proposal_completed']['user_id'] ?? NULL;
+            $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
+            $message['headers'] = $params['research_migration_proposal_completed']['headers'] ?? [];
+            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project has been completed', ['!site_name' => $site_name]);
+            if ($proposal_data) {
+                $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
+                $message['body'][] = '';
+                $message['body'][] = t('Your Research Migration Project has been completed successfully.');
+                $message['body'][] = t('Project Title: @title', ['@title' => $proposal_data->project_title]);
+                $message['body'][] = '';
+                $message['body'][] = t('Best Wishes,');
+                $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+                $message['body'][] = t('FOSSEE, IIT Bombay');
+            }
+            break;
+        }
+
+        case 'research_migration_proposal_deleted': {
+            $proposal_id = $params['research_migration_proposal_deleted']['proposal_id'] ?? NULL;
+            $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
+            $message['headers'] = $params['research_migration_proposal_deleted']['headers'] ?? [];
+            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been deleted', ['!site_name' => $site_name]);
+            if ($proposal_data) {
+                $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
+                $message['body'][] = '';
+                $message['body'][] = t('Your Research Migration Project proposal has been deleted.');
+                $message['body'][] = t('Project Title: @title', ['@title' => $proposal_data->project_title]);
+                $message['body'][] = '';
+                $message['body'][] = t('Best Wishes,');
+                $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+                $message['body'][] = t('FOSSEE, IIT Bombay');
+            }
+            break;
+        }
+
+        case 'abstract_uploaded': {
+            $proposal_id = $params['abstract_uploaded']['proposal_id'] ?? NULL;
+            $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
+            $message['headers'] = $params['abstract_uploaded']['headers'] ?? [];
+            $message['subject'] = t('[!site_name][Research Migration Project] You have uploaded Research Migration Project files', ['!site_name' => $site_name]);
+            if ($proposal_data) {
+                $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
+                $message['body'][] = '';
+                $message['body'][] = t('You have uploaded project files for the following Research Migration Project:');
+                $message['body'][] = t('Project Title: @title', ['@title' => $proposal_data->project_title]);
+                $message['body'][] = '';
+                $message['body'][] = t('Your files are under review. You will be notified when they have been approved.');
+                $message['body'][] = '';
+                $message['body'][] = t('Best Wishes,');
+                $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+                $message['body'][] = t('FOSSEE, IIT Bombay');
+            }
+            break;
+        }
+
+        case 'abstract_edit_file_uploaded': {
+            $proposal_id = $params['abstract_edit_file_uploaded']['proposal_id'] ?? NULL;
+            $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
+            $message['headers'] = $params['abstract_edit_file_uploaded']['headers'] ?? [];
+            $message['subject'] = t('[!site_name][Research Migration Project] You have updated project files/synopsis of a Research Migration', ['!site_name' => $site_name]);
+            if ($proposal_data) {
+                $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
+                $message['body'][] = '';
+                $message['body'][] = t('You have updated the project files for the following Research Migration Project:');
+                $message['body'][] = t('Project Title: @title', ['@title' => $proposal_data->project_title]);
+                $message['body'][] = '';
+                $message['body'][] = t('Best Wishes,');
+                $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+                $message['body'][] = t('FOSSEE, IIT Bombay');
+            }
+            break;
+        }
+
+        case 'standard': {
+            $message['subject'] = $params['standard']['subject'] ?? '';
+            $message['body'] = $params['standard']['body'] ?? [];
+            $message['headers'] = $params['standard']['headers'] ?? [];
+            break;
+        }
     }
 }
