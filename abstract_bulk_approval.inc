@@ -72,7 +72,7 @@ function ajax_bulk_research_migration_abstract_details_callback($form, $form_sta
 	{
 		$commands[] = ajax_command_html('#ajax_selected_research_migration', _research_migration_details($research_migration_project_default_value));
 		$form['research_migration_actions']['#options'] = _bulk_list_research_migration_actions();
-		$commands[] = ajax_command_replace('#ajax_selected_research_migration_action', drupal_render($form['research_migration_actions']));
+		$commands[] = ajax_command_replace('#ajax_selected_research_migration_action', \Drupal::service("renderer")->render($form['research_migration_actions']));
 	} //$research_migration_project_default_value != 0
 	else
 	{
@@ -87,7 +87,7 @@ function ajax_bulk_research_migration_abstract_details_callback($form, $form_sta
 /************************************************************/
 function esim_research_migration_abstract_bulk_approval_form_submit($form, &$form_state)
 {
-	global $user;
+	$user = \Drupal::currentUser();
 	$msg = '';
 	$root_path = esim_research_migration_path();
 	//var_dump($root_path);die;
@@ -96,19 +96,19 @@ function esim_research_migration_abstract_bulk_approval_form_submit($form, &$for
 		if ($form_state['values']['research_migration_project'])
 			//var_dump($form_state['values']['research_migration_actions']);die;
 		// research_migration_abstract_del_lab_pdf($form_state['values']['research_migration_project']);
-			if (user_access('Research Migration bulk manage abstract'))
+			if (\Drupal::currentUser()->hasPermission('Research Migration bulk manage abstract'))
 			{
-				$query = db_select('research_migration_proposal');
+				$query = \Drupal::database()->select('research_migration_proposal');
 				$query->fields('research_migration_proposal');
 				$query->condition('id', $form_state['values']['research_migration_project']);
 				$user_query = $query->execute();
 				$user_info = $user_query->fetchObject();
 				//var_dump($user_info);die;
-				$user_data = user_load($user_info->uid);
+				$user_data = \Drupal::entityTypeManager()->getStorage('user')->load($user_info->uid);
 				if ($form_state['values']['research_migration_actions'] == 1)
 				{
 					// approving entire project //
-					$query = db_select('research_migration_submitted_abstracts');
+					$query = \Drupal::database()->select('research_migration_submitted_abstracts');
 					$query->fields('research_migration_submitted_abstracts');
 					$query->condition('proposal_id', $form_state['values']['research_migration_project']);
 					$abstracts_q = $query->execute();
@@ -116,43 +116,68 @@ function esim_research_migration_abstract_bulk_approval_form_submit($form, &$for
 					$experiment_list = '';
 					while ($abstract_data = $abstracts_q->fetchObject())
 					{
-						db_query("UPDATE {research_migration_submitted_abstracts} SET abstract_approval_status = 1, is_submitted = 1, approver_uid = :approver_uid WHERE id = :id", array(
+						\Drupal::database()->query("UPDATE {research_migration_submitted_abstracts} SET abstract_approval_status = 1, is_submitted = 1, approver_uid = :approver_uid WHERE id = :id", array(
 							':approver_uid' => $user->uid,
 							':id' => $abstract_data->id
 						));
-						db_query("UPDATE {research_migration_submitted_abstracts_file} SET file_approval_status = 1, approvar_uid = :approver_uid WHERE submitted_abstract_id = :submitted_abstract_id", array(
+						\Drupal::database()->query("UPDATE {research_migration_submitted_abstracts_file} SET file_approval_status = 1, approvar_uid = :approver_uid WHERE submitted_abstract_id = :submitted_abstract_id", array(
 							':approver_uid' => $user->uid,
 							':submitted_abstract_id' => $abstract_data->id
 						));
 					} //$abstract_data = $abstracts_q->fetchObject()
-					drupal_set_message(t('Approved Research Migration Project. Use the checkbox below to publish this Research Migration on the completed Research Migration page.'), 'status');
+					\Drupal::messenger()->addStatus(t('Approved Research Migration Project. Use the checkbox below to publish this Research Migration on the completed Research Migration page.'));
 					drupal_goto('research-migration-project/manage-proposal/status/' . $form_state['values']['research_migration_project']);
 					// email 
-					$email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been approved', array(
-						'!site_name' => variable_get('site_name', '')
-					));
-					$email_body = array(
-						0 => t('
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been approved', array(
+// 						'!site_name' => variable_get('site_name', '')
+// 					));
 
-Dear ' . $user_info->contributor_name . ',
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $email_body = array(
+// 						0 => t('
+// 
+// Dear ' . $user_info->contributor_name . ',
+// 
+// Your uploaded project files for the Research Migration project has been approved.
+// 
+// Title of Research Migration project  : ' . $user_info->project_title . '
+// 
+// Best Wishes,
+// 
+// !site_name Team,
+// FOSSEE,IIT Bombay', array(
+// 							'!site_name' => variable_get('site_name', ''),
+// 							'!user_name' => $user_data->name
+// 						))
+// 					);
 
-Your uploaded project files for the Research Migration project has been approved.
-
-Title of Research Migration project  : ' . $user_info->project_title . '
-
-Best Wishes,
-
-!site_name Team,
-FOSSEE,IIT Bombay', array(
-							'!site_name' => variable_get('site_name', ''),
-							'!user_name' => $user_data->name
-						))
-					);
 					/** sending email when everything done **/
 					$email_to = $user_data->mail;
-					$from = variable_get('research_migration_from_email', '');
-					$bcc = variable_get('research_migration_emails', '');
-					$cc = variable_get('research_migration_cc_emails', '');
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $from = variable_get('research_migration_from_email', '');
+
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $bcc = variable_get('research_migration_emails', '');
+
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $cc = variable_get('research_migration_cc_emails', '');
+
 					$params['standard']['subject'] = $email_subject;
 					$params['standard']['body'] = $email_body;
 					$params['standard']['headers'] = array(
@@ -166,59 +191,84 @@ FOSSEE,IIT Bombay', array(
 					);
 					if (!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE))
 					{
-						$msg = drupal_set_message('Error sending email message.', 'error');
+						$msg = \Drupal::messenger()->addError('Error sending email message.');
 					} //!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)
 				} //$form_state['values']['research_migration_actions'] == 1
 				elseif ($form_state['values']['research_migration_actions'] == 2)
 				{
 					//pending review entire project 
-					$query = db_select('research_migration_submitted_abstracts');
+					$query = \Drupal::database()->select('research_migration_submitted_abstracts');
 					$query->fields('research_migration_submitted_abstracts');
 					$query->condition('proposal_id', $form_state['values']['research_migration_project']);
 					$abstracts_q = $query->execute();
 					$experiment_list = '';
 					while ($abstract_data = $abstracts_q->fetchObject())
 					{
-						db_query("UPDATE {research_migration_submitted_abstracts} SET abstract_approval_status = 0, is_submitted = 0, approver_uid = :approver_uid WHERE id = :id", array(
+						\Drupal::database()->query("UPDATE {research_migration_submitted_abstracts} SET abstract_approval_status = 0, is_submitted = 0, approver_uid = :approver_uid WHERE id = :id", array(
 							':approver_uid' => $user->uid,
 							':id' => $abstract_data->id
 						));
-						db_query("UPDATE {research_migration_proposal} SET is_submitted = 0, approver_uid = :approver_uid WHERE id = :id", array(
+						\Drupal::database()->query("UPDATE {research_migration_proposal} SET is_submitted = 0, approver_uid = :approver_uid WHERE id = :id", array(
 							':approver_uid' => $user->uid,
 							':id' => $abstract_data->proposal_id
 						));
-						db_query("UPDATE {research_migration_submitted_abstracts_file} SET file_approval_status = 0, approvar_uid = :approver_uid WHERE submitted_abstract_id = :submitted_abstract_id", array(
+						\Drupal::database()->query("UPDATE {research_migration_submitted_abstracts_file} SET file_approval_status = 0, approvar_uid = :approver_uid WHERE submitted_abstract_id = :submitted_abstract_id", array(
 							':approver_uid' => $user->uid,
 							':submitted_abstract_id' => $abstract_data->id
 						));
 					} //$abstract_data = $abstracts_q->fetchObject()
-					drupal_set_message(t('The proposal has been marked for resubmission'), 'status');
+					\Drupal::messenger()->addStatus(t('The proposal has been marked for resubmission'));
 					// email 
-					$email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been marked as pending', array(
-						'!site_name' => variable_get('site_name', '')
-					));
-					$email_body = array(
-						0 => t('
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been marked as pending', array(
+// 						'!site_name' => variable_get('site_name', '')
+// 					));
 
-Dear ' . $user_info->contributor_name . ',
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $email_body = array(
+// 						0 => t('
+// 
+// Dear ' . $user_info->contributor_name . ',
+// 
+// Kindly resubmit the project files for the project : ' . $user_info->project_title . '.
+// 
+// Reason for resubmission: ' . $form_state['values']['message'] . '
+// 
+// Best Wishes,
+// 
+// !site_name Team,
+// FOSSEE,IIT Bombay', array(
+// 							'!site_name' => variable_get('site_name', ''),
+// 							'!user_name' => $user_data->name
+// 						))
+// 					);
 
-Kindly resubmit the project files for the project : ' . $user_info->project_title . '.
-
-Reason for resubmission: ' . $form_state['values']['message'] . '
-
-Best Wishes,
-
-!site_name Team,
-FOSSEE,IIT Bombay', array(
-							'!site_name' => variable_get('site_name', ''),
-							'!user_name' => $user_data->name
-						))
-					);
 					/** sending email when everything done **/
 					$email_to = $user_data->mail;
-					$from = variable_get('research_migration_from_email', '');
-					$bcc = variable_get('research_migration_emails', '');
-					$cc = variable_get('research_migration_cc_emails', '');
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $from = variable_get('research_migration_from_email', '');
+
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $bcc = variable_get('research_migration_emails', '');
+
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $cc = variable_get('research_migration_cc_emails', '');
+
 					$params['standard']['subject'] = $email_subject;
 					$params['standard']['body'] = $email_body;
 					$params['standard']['headers'] = array(
@@ -232,7 +282,7 @@ FOSSEE,IIT Bombay', array(
 					);
 					if (!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE))
 					{
-						drupal_set_message('Error sending email message.', 'error');
+						\Drupal::messenger()->addError('Error sending email message.');
 					} //!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)
 				} //$form_state['values']['research_migration_actions'] == 2
 				elseif ($form_state['values']['research_migration_actions'] == 3) //disapprove and delete entire Research Migration project
@@ -240,40 +290,65 @@ FOSSEE,IIT Bombay', array(
 					if (strlen(trim($form_state['values']['message'])) <= 30)
 					{
 						form_set_error('message', t(''));
-						$msg = drupal_set_message("Please mention the reason for disapproval. Minimum 30 character required", 'error');
+						$msg = \Drupal::messenger()->addError("Please mention the reason for disapproval. Minimum 30 character required");
 						return $msg;
 					} //strlen(trim($form_state['values']['message'])) <= 30
-					if (!user_access('Research Migration bulk delete abstract'))
+					if (!\Drupal::currentUser()->hasPermission('Research Migration bulk delete abstract'))
 					{
-						$msg = drupal_set_message(t('You do not have permission to Bulk Dis-Approved and Deleted Entire Lab.'), 'error');
+						$msg = \Drupal::messenger()->addError(t('You do not have permission to Bulk Dis-Approved and Deleted Entire Lab.'));
 						return $msg;
 					} //!user_access('research_migration bulk delete code')
 					if (research_migration_abstract_delete_project($form_state['values']['research_migration_project'])) //////
 					{
-						drupal_set_message(t('Dis-Approved and Deleted Entire Research Migration project.'), 'status');
-						$email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been marked as dis-approved', array(
-						'!site_name' => variable_get('site_name', '')
-					));
-					$email_body = array(
-						0 => t('
-Dear ' . $user_info->contributor_name . ',
+						\Drupal::messenger()->addStatus(t('Dis-Approved and Deleted Entire Research Migration project.'));
+						// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been marked as dis-approved', array(
+// 						'!site_name' => variable_get('site_name', '')
+// 					));
 
-We regret to inform you that the project files submitted for the Research Migration project title: ' . $user_info->project_title . ' are disapproved by the reviewer.
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $email_body = array(
+// 						0 => t('
+// Dear ' . $user_info->contributor_name . ',
+// 
+// We regret to inform you that the project files submitted for the Research Migration project title: ' . $user_info->project_title . ' are disapproved by the reviewer.
+// 
+// Reason for dis-approval: ' . $form_state['values']['message'] . '
+// 
+// Best Wishes,
+// 
+// !site_name Team,
+// FOSSEE,IIT Bombay', array(
+// 						'!site_name' => variable_get('site_name', ''),
+// 						'!user_name' => $user_data->name
+// 											))
+// 					);
 
-Reason for dis-approval: ' . $form_state['values']['message'] . '
-
-Best Wishes,
-
-!site_name Team,
-FOSSEE,IIT Bombay', array(
-						'!site_name' => variable_get('site_name', ''),
-						'!user_name' => $user_data->name
-											))
-					);
 					$email_to = $user_data->mail;
-					$from = variable_get('research_migration_from_email', '');
-					$bcc = variable_get('research_migration_emails', '');
-					$cc = variable_get('research_migration_cc_emails', '');
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $from = variable_get('research_migration_from_email', '');
+
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $bcc = variable_get('research_migration_emails', '');
+
+					// @FIXME
+// // @FIXME
+// // This looks like another module's variable. You'll need to rewrite this call
+// // to ensure that it uses the correct configuration object.
+// $cc = variable_get('research_migration_cc_emails', '');
+
 					$params['standard']['subject'] = $email_subject;
 					$params['standard']['body'] = $email_body;
 					$params['standard']['headers'] = array(
@@ -287,12 +362,12 @@ FOSSEE,IIT Bombay', array(
 					);
 					if (!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE))
 					{
-						drupal_set_message('Error sending email message.', 'error');
+						\Drupal::messenger()->addError('Error sending email message.');
 					}
 					} //research_migration_abstract_delete_project($form_state['values']['research_migration_project'])
 					else
 					{
-						drupal_set_message(t('Error Dis-Approving and Deleting Entire Research Migration project.'), 'error');
+						\Drupal::messenger()->addError(t('Error Dis-Approving and Deleting Entire Research Migration project.'));
 					}
 					// email 
 					
@@ -308,7 +383,7 @@ function _bulk_list_of_research_migration_project()
 	$project_titles = array(
 		'0' => 'Please select...'
 	);
-	$query = db_select('research_migration_proposal');
+	$query = \Drupal::database()->select('research_migration_proposal');
 	$query->fields('research_migration_proposal');
 	$query->condition('is_submitted', 1);
 	$query->condition('approval_status', 1);
@@ -334,12 +409,12 @@ function _bulk_list_research_migration_actions()
 function _research_migration_details($research_migration_proposal_id)
 {
 	$return_html = "";
-	$query_pro = db_select('research_migration_proposal');
+	$query_pro = \Drupal::database()->select('research_migration_proposal');
 	$query_pro->fields('research_migration_proposal');
 	$query_pro->condition('id', $research_migration_proposal_id);
 	$abstracts_pro = $query_pro->execute()->fetchObject();
 	//var_dump($abstracts_pro);die;
-	$query_pdf = db_select('research_migration_submitted_abstracts_file');
+	$query_pdf = \Drupal::database()->select('research_migration_submitted_abstracts_file');
 	$query_pdf->fields('research_migration_submitted_abstracts_file');
 	$query_pdf->condition('proposal_id', $research_migration_proposal_id);
 	$query_pdf->condition('filetype', 'A');
@@ -359,12 +434,12 @@ function _research_migration_details($research_migration_proposal_id)
 	{
 		$abstract_filename = "File not uploaded";
 	}
-	$query_process = db_select('research_migration_submitted_abstracts_file');
+	$query_process = \Drupal::database()->select('research_migration_submitted_abstracts_file');
 	$query_process->fields('research_migration_submitted_abstracts_file');
 	$query_process->condition('proposal_id', $research_migration_proposal_id);
 	$query_process->condition('filetype', 'S');
 	$abstracts_query_process = $query_process->execute()->fetchObject();
-	$query = db_select('research_migration_submitted_abstracts');
+	$query = \Drupal::database()->select('research_migration_submitted_abstracts');
 	$query->fields('research_migration_submitted_abstracts');
 	$query->condition('proposal_id', $research_migration_proposal_id);
 	$abstracts_q = $query->execute()->fetchObject();
@@ -390,10 +465,16 @@ function _research_migration_details($research_migration_proposal_id)
 	} //$abstracts_query_process == TRUE
 	else
 	{
-		$url = l('Upload abstract', 'research-migration-project/abstract-code/upload');
+		// @FIXME
+// l() expects a Url object, created from a route name or external URI.
+// $url = l('Upload abstract', 'research-migration-project/abstract-code/upload');
+
 		$abstracts_query_process_filename = "File not uploaded";
 	}
-	$download_research_migration = l('Download Research Migration project','research-migration-project/full-download/project/'.$research_migration_proposal_id);
+	// @FIXME
+// l() expects a Url object, created from a route name or external URI.
+// $download_research_migration = l('Download Research Migration project','research-migration-project/full-download/project/'.$research_migration_proposal_id);
+
 	$return_html .= '<strong>Proposer Name:</strong><br />' . $abstracts_pro->name_title . ' ' . $abstracts_pro->contributor_name . '<br /><br />';
 	$return_html .= '<strong>Title of the Research Migration Project:</strong><br />' . $abstracts_pro->project_title . '<br /><br />';
 	$return_html .= '<strong>Uploaded an abstract (brief outline) of the project:</strong><br />' . $abstract_filename . '<br /><br />';

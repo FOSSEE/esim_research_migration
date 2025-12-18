@@ -6,17 +6,17 @@ function research_migration_abstract_delete_project($proposal_id)
 {
 	$status = TRUE;
 	$root_path = esim_research_migration_path();
-	$query = db_select('research_migration_proposal');
+	$query = \Drupal::database()->select('research_migration_proposal');
 	$query->fields('research_migration_proposal');
 	$query->condition('id', $proposal_id);
 	$proposal_q = $query->execute();
 	$proposal_data = $proposal_q->fetchObject();
 	if (!$proposal_data)
 	{
-		drupal_set_message('Invalid Research Migration Project.', 'error');
+		\Drupal::messenger()->addError('Invalid Research Migration Project.');
 		return FALSE;
 	} //!$proposal_data
-	$query = db_select('research_migration_submitted_abstracts_file');
+	$query = \Drupal::database()->select('research_migration_submitted_abstracts_file');
 	$query->fields('research_migration_submitted_abstracts_file');
 	$query->condition('proposal_id', $proposal_id);
 	$abstract_q = $query->execute();
@@ -29,15 +29,15 @@ function research_migration_abstract_delete_project($proposal_id)
 		}
 		else
 		{
-			drupal_set_message('Invalid Research Migration Project Abstract.', 'error');
+			\Drupal::messenger()->addError('Invalid Research Migration Project Abstract.');
 		}
-		db_delete('research_migration_submitted_abstracts_file')->condition('proposal_id', $proposal_id)->execute();
+		\Drupal::database()->delete('research_migration_submitted_abstracts_file')->condition('proposal_id', $proposal_id)->execute();
 		//!dwsim_flowsheet_delete_abstract_file($abstract_data->id)
 	}
-	db_delete('research_migration_submitted_abstracts')->condition('proposal_id', $proposal_id)->execute();
+	\Drupal::database()->delete('research_migration_submitted_abstracts')->condition('proposal_id', $proposal_id)->execute();
 	unlink($root_path . $proposal_data->samplefilepath);
 	$res = rmdir($root_path . $proposal_data->directory_name);
-	db_delete('research_migration_proposal')->condition('id', $proposal_data->id)->execute();
+	\Drupal::database()->delete('research_migration_proposal')->condition('id', $proposal_data->id)->execute();
 	
 	return $status;
 }
