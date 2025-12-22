@@ -27,11 +27,12 @@ class DefaultController extends ControllerBase {
   public function esim_research_migration_proposal_pending() {
     $pending_rows = [];
 
-    $query = \Drupal::database()->select('research_migration_proposal', 'r');
-    $query->fields('r');
-    $query->condition('r.approval_status', 0);
-    $query->orderBy('r.id', 'DESC');
-    $pending_q = $query->execute();
+    $pending_q = \Drupal::database()->select('research_migration_proposal', 'r')
+      ->fields('r')
+      ->condition('r.approval_status', 0)
+      ->orderBy('r.id', 'DESC')
+      ->execute()
+      ->fetchAll();
 
     foreach ($pending_q as $pending_data) {
       $submission_date = date('d-m-Y', $pending_data->creation_date);
@@ -78,20 +79,38 @@ class DefaultController extends ControllerBase {
   public function esim_research_migration_proposal_all() {
     $proposal_rows = [];
 
-    $query = \Drupal::database()->select('research_migration_proposal', 'p');
-    $query->fields('p');
-    $query->orderBy('id', 'DESC');
-    $proposal_q = $query->execute();
+    $proposal_q = \Drupal::database()->select('research_migration_proposal', 'p')
+      ->fields('p')
+      ->orderBy('id', 'DESC')
+      ->execute()
+      ->fetchAll();
 
     foreach ($proposal_q as $proposal_data) {
-      $approval_status = match ($proposal_data->approval_status) {
-        0 => $this->t('Pending'),
-        1 => $this->t('Approved'),
-        2 => $this->t('Dis-approved'),
-        3 => $this->t('Completed'),
-        5 => $this->t('On Hold'),
-        default => $this->t('Unknown'),
-      };
+      switch ((int) $proposal_data->approval_status) {
+        case 0:
+          $approval_status = $this->t('Pending');
+          break;
+
+        case 1:
+          $approval_status = $this->t('Approved');
+          break;
+
+        case 2:
+          $approval_status = $this->t('Dis-approved');
+          break;
+
+        case 3:
+          $approval_status = $this->t('Completed');
+          break;
+
+        case 5:
+          $approval_status = $this->t('On Hold');
+          break;
+
+        default:
+          $approval_status = $this->t('Unknown');
+          break;
+      }
 
       $actual_completion_date = $proposal_data->actual_completion_date
         ? date('d-m-Y', $proposal_data->actual_completion_date)
@@ -151,14 +170,31 @@ public function esim_research_migration_proposal_edit_file_all() {
 
   foreach ($results as $proposal_data) {
     // Determine status
-    $approval_status = match ($proposal_data->approval_status) {
-      0 => 'Pending',
-      1 => 'Approved',
-      2 => 'Dis-approved',
-      3 => 'Completed',
-      5 => 'On Hold',
-      default => 'Unknown',
-    };
+    switch ((int) $proposal_data->approval_status) {
+      case 0:
+        $approval_status = 'Pending';
+        break;
+
+      case 1:
+        $approval_status = 'Approved';
+        break;
+
+      case 2:
+        $approval_status = 'Dis-approved';
+        break;
+
+      case 3:
+        $approval_status = 'Completed';
+        break;
+
+      case 5:
+        $approval_status = 'On Hold';
+        break;
+
+      default:
+        $approval_status = 'Unknown';
+        break;
+    }
 
     $actual_completion_date = $proposal_data->actual_completion_date == 0
       ? 'Not Completed'
@@ -361,11 +397,11 @@ public function esim_research_migration_proposal_edit_file_all() {
     $query->fields('r');
     $query->condition('approval_status', 3);
     $query->orderBy('actual_completion_date', 'DESC');
-    $result = $query->execute();
- $records = $result->fetchAll();
+    $records = $query->execute()->fetchAll();
+
     $rows = [];
     $counter = count($records);
-    foreach ($result as $row) {
+    foreach ($records as $row) {
       $year = $row->actual_completion_date ? date('Y', $row->actual_completion_date) : $this->t('NA');
       $project_link = Link::fromTextAndUrl(
         $row->project_title,
@@ -411,11 +447,10 @@ public function esim_research_migration_proposal_edit_file_all() {
     $query->condition('approval_status', 1);
     $query->condition('is_completed', 0);
     $query->orderBy('approval_date', 'DESC');
-    $result = $query->execute();
-$result1 = $result->fetchAll();
+    $results = $query->execute()->fetchAll();
     $rows = [];
-    $counter = Count($result1);
-    foreach ($result as $row) {
+    $counter = count($results);
+    foreach ($results as $row) {
       $approval_year = $row->approval_date ? date('Y', $row->approval_date) : $this->t('NA');
       $rows[] = [
         $counter,
