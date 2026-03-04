@@ -10,6 +10,7 @@ namespace Drupal\esim_research_migration\Form;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
+use Drupal\Core\Cache\Cache;
 
 class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
 
@@ -116,7 +117,7 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
   }
 
   public function validateForm(array &$form, FormStateInterface $form_state) {
-    if (isset($_FILES['files'])) {
+    if (isset($_FILES['files']['name']) && is_array($_FILES['files']['name'])) {
       /* check if file is uploaded */
       $existing_uploaded_A_file = default_value_for_uploaded_files("A", $form_state->getValue([
         'prop_id'
@@ -125,17 +126,17 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
         'prop_id'
         ]));
       if (!$existing_uploaded_S_file) {
-        if (!($_FILES['files']['name']['upload_research_migration_developed_process'])) {
+        if (empty($_FILES['files']['name']['upload_research_migration_developed_process'])) {
           $form_state->setErrorByName('upload_research_migration_developed_process', t('Please upload the file.'));
         }
       } //!$existing_uploaded_S_file
       if (!$existing_uploaded_A_file) {
-        if (!($_FILES['files']['name']['upload_an_abstract'])) {
+        if (empty($_FILES['files']['name']['upload_an_abstract'])) {
           $form_state->setErrorByName('upload_an_abstract', t('Please upload the file.'));
         }
       } //!$existing_uploaded_A_file
 		/* check for valid filename extensions */
-      if ($_FILES['files']['name']['upload_an_udc'] || $_FILES['files']['name']['upload_an_abstract'] || $_FILES['files']['name']['upload_research_migration_developed_process']) {
+      if (!empty($_FILES['files']['name']['upload_an_abstract']) || !empty($_FILES['files']['name']['upload_research_migration_developed_process'])) {
         foreach ($_FILES['files']['name'] as $file_form_name => $file_name) {
           if ($file_name) {
             /* checking file type */
@@ -161,17 +162,17 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
 
                 break;
             } //$file_type
-            $allowed_extensions = explode(',', $allowed_extensions_str);
-            $tmp_ext = explode('.', strtolower($_FILES['files']['name'][$file_form_name]));
+            $allowed_extensions = array_filter(array_map('trim', explode(',', $allowed_extensions_str)));
+            $tmp_ext = explode('.', strtolower((string) $_FILES['files']['name'][$file_form_name]));
             $temp_extension = end($tmp_ext);
-            if (!in_array($temp_extension, $allowed_extensions)) {
+            if ($allowed_extensions && !in_array($temp_extension, $allowed_extensions, TRUE)) {
               $form_state->setErrorByName($file_form_name, t('Only file with ' . $allowed_extensions_str . ' extensions can be uploaded.'));
             }
-            if ($_FILES['files']['size'][$file_form_name] <= 0) {
+            if (!empty($_FILES['files']['size'][$file_form_name]) && $_FILES['files']['size'][$file_form_name] <= 0) {
               $form_state->setErrorByName($file_form_name, t('File size cannot be zero.'));
             }
             /* check if valid file name */
-            if (!esim_research_migration_check_valid_filename($_FILES['files']['name'][$file_form_name])) {
+            if (!esim_research_migration_check_valid_filename((string) $_FILES['files']['name'][$file_form_name])) {
               $form_state->setErrorByName($file_form_name, t('Invalid file name specified. Only alphabets and numbers are allowed as a valid filename.'));
             }
           } //$file_name
@@ -270,7 +271,9 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
         if (file_exists($root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name])) {
           //unlink($root_path . $dest_path . $_FILES['files']['name'][$file_form_name]);
                         // move upload and update table file type and timestamp
-          move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name]);
+          if (is_uploaded_file($_FILES['files']['tmp_name'][$file_form_name])) {
+            move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name]);
+          }
           $query = "UPDATE {research_migration_submitted_abstracts_file} SET filesize=:filesize, timestamp=:timestamp WHERE proposal_id = :proposal_id AND filetype = :filetype";
           $args = [
             ":filesize" => $_FILES['files']['size'][$file_form_name],
@@ -286,7 +289,7 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
         } //file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
                     /* uploading file */
         else {
-          if (move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name])) {
+          if (is_uploaded_file($_FILES['files']['tmp_name'][$file_form_name]) && move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name])) {
             /* for uploaded files making an entry in the database */
             $query_abstracts = "SELECT * FROM research_migration_submitted_abstracts WHERE proposal_id = :proposal_id";
             $query_abstracts_args = [":proposal_id" => $proposal_id];
@@ -322,7 +325,7 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
               $query = "UPDATE {research_migration_submitted_abstracts_file} SET filename = :filename, filepath=:filepath, filemime=:filemime, filesize=:filesize, timestamp=:timestamp WHERE proposal_id = :proposal_id AND filetype = :filetype";
               $args = [
                 ":filename" => $_FILES['files']['name'][$file_form_name],
-                ":filepath" => $file_path . $_FILES['files']['name'][$file_form_name],
+                ":filepath" => $_FILES['files']['name'][$file_form_name],
                 ":filemime" => mime_content_type($root_path . $dest_path_project_files . $_FILES['files']['name'][$file_form_name]),
                 ":filesize" => $_FILES['files']['size'][$file_form_name],
                 ":timestamp" => time(),
@@ -342,7 +345,7 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
       } //$file_name
     } //$_FILES['files']['name'] as $file_form_name => $file_name
     /* sending email */
-    $email_to = $user ? $user->getEmail() : '';
+    $email_to = $user ? (string) $user->getEmail() : '';
     $config = \Drupal::config('esim_research_migration.settings');
     $from = (string) ($config->get('research_migration_from_email') ?: \Drupal::config('system.site')->get('mail'));
     $bcc = (string) $config->get('research_migration_emails');
@@ -362,12 +365,20 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
     ];
     $mail_manager = \Drupal::service('plugin.manager.mail');
     $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
-    $mail_result = $mail_manager->mail('esim_research_migration', 'abstract_uploaded', $email_to, $langcode, $params, $from, TRUE);
-    if (empty($mail_result['result'])) {
-      $this->messenger()->addError($this->t('Error sending email message.'));
+    if ($email_to !== '') {
+      $mail_result = $mail_manager->mail('esim_research_migration', 'abstract_uploaded', $email_to, $langcode, $params, $from, TRUE);
+      if (empty($mail_result['result'])) {
+        $this->messenger()->addError($this->t('Error sending email message.'));
+      }
     }
 
     $form_state->setRedirect('esim_research_migration.abstract');
+    Cache::invalidateTags([
+      'research_migration_proposal_list',
+      'research_migration_proposal:' . $proposal_id,
+      'research_migration_submitted_abstracts_list',
+      'research_migration_submitted_abstracts_file_list',
+    ]);
   }
 
 }

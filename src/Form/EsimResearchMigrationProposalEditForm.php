@@ -11,6 +11,7 @@ use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
 use Drupal\Core\Link;
+use Drupal\Core\Cache\Cache;
 
 class EsimResearchMigrationProposalEditForm extends FormBase {
 
@@ -195,10 +196,11 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
       $user_storage = \Drupal::entityTypeManager()->getStorage('user');
       /** @var \Drupal\user\UserInterface|null $user_data */
       $user_data = $user_storage->load($proposal_data->uid);
-      $email_to = $user_data ? $user_data->getEmail() : '';
+      $email_to = $user_data ? (string) $user_data->getEmail() : '';
 
       $config = \Drupal::config('esim_research_migration.settings');
       $from = (string) $config->get('research_migration_from_email');
+      // ?: \Drupal::config('system.site')->get('mail'))
       $bcc = (string) $config->get('research_migration_emails');
       $cc = (string) $config->get('research_migration_cc_emails');
 
@@ -216,10 +218,11 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
 
       $mail_manager = \Drupal::service('plugin.manager.mail');
       $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
-      $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_proposal_deleted', $email_to, $langcode, $params, $from, TRUE);
-
-      if (empty($mail_result['result'])) {
-        $this->messenger()->addError($this->t('Error sending email message.'));
+      if ($email_to !== '') {
+        $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_proposal_deleted', $email_to, $langcode, $params, $from, TRUE);
+        if (empty($mail_result['result'])) {
+          $this->messenger()->addError($this->t('Error sending email message.'));
+        }
       }
 
       $this->messenger()->addStatus($this->t('The Research Migration proposal has been deleted.'));
@@ -229,6 +232,7 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
         $delete_query->execute();
         $this->messenger()->addStatus($this->t('Proposal Deleted'));
         $form_state->setRedirect('esim_research_migration.proposal_pending');
+        Cache::invalidateTags(['research_migration_proposal_list', 'research_migration_proposal:' . $proposal_id]);
         return;
       }
     }
@@ -278,6 +282,7 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
     ];
     $connection->query($query, $args);
     $this->messenger()->addStatus($this->t('Proposal Updated'));
+    Cache::invalidateTags(['research_migration_proposal_list', 'research_migration_proposal:' . $proposal_id]);
   }
 
 }

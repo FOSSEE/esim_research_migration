@@ -9,11 +9,11 @@ namespace Drupal\esim_research_migration\Controller;
 
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Link;
-use Drupal\Core\Render\Markup;
 use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use ZipArchive;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Drupal\Component\Utility\UrlHelper;
 
 /**
  * Default controller for the esim_research_migration module.
@@ -37,28 +37,31 @@ class DefaultController extends ControllerBase {
     foreach ($pending_q as $pending_data) {
       $submission_date = date('d-m-Y', $pending_data->creation_date);
 
-      $user_link = Link::fromTextAndUrl(
-        $pending_data->name_title . ' ' . $pending_data->contributor_name,
-        Url::fromRoute('entity.user.canonical', ['user' => $pending_data->uid])
-      )->toRenderable();
-
-      $approve_link = Link::fromTextAndUrl(
-        $this->t('Approve'),
-        Url::fromRoute('esim_research_migration.proposal_approval_form', ['proposal_id' => $pending_data->id])
-      )->toString();
-
-      $edit_link = Link::fromTextAndUrl(
-        $this->t('Edit'),
-        Url::fromRoute('esim_research_migration.proposal_edit_form', ['proposal_id' => $pending_data->id])
-      )->toString();
-
-      $action_markup = Markup::create($approve_link . ' | ' . $edit_link);
-
       $pending_rows[] = [
-        ['data' => $submission_date],
-        ['data' => $user_link],
-        ['data' => $pending_data->project_title],
-        ['data' => ['#markup' => $action_markup]],
+        ['data' => ['#plain_text' => $submission_date]],
+        [
+          'data' => Link::fromTextAndUrl(
+            $pending_data->name_title . ' ' . $pending_data->contributor_name,
+            Url::fromRoute('entity.user.canonical', ['user' => $pending_data->uid])
+          )->toRenderable(),
+        ],
+        ['data' => ['#plain_text' => $pending_data->project_title]],
+        [
+          'data' => [
+            '#type' => 'inline_template',
+            '#template' => '{{ approve }} | {{ edit }}',
+            '#context' => [
+              'approve' => Link::fromTextAndUrl(
+                $this->t('Approve'),
+                Url::fromRoute('esim_research_migration.proposal_approval_form', ['proposal_id' => $pending_data->id])
+              )->toRenderable(),
+              'edit' => Link::fromTextAndUrl(
+                $this->t('Edit'),
+                Url::fromRoute('esim_research_migration.proposal_edit_form', ['proposal_id' => $pending_data->id])
+              )->toRenderable(),
+            ],
+          ],
+        ],
       ];
     }
 
@@ -73,6 +76,10 @@ class DefaultController extends ControllerBase {
       '#rows' => $pending_rows,
       '#attributes' => ['class' => ['research-migration-pending-table']],
       '#empty' => $this->t('There are no pending proposals.'),
+      '#cache' => [
+        'tags' => ['research_migration_proposal_list'],
+        'contexts' => ['user.permissions'],
+      ],
     ];
   }
 
@@ -119,26 +126,34 @@ class DefaultController extends ControllerBase {
         ? date('d-m-Y', $proposal_data->approval_date)
         : $this->t('Not Approved');
 
-      $status_link = Link::fromTextAndUrl(
-        $this->t('Status'),
-        Url::fromRoute('esim_research_migration.proposal_status_form', ['proposal_id' => $proposal_data->id])
-      )->toString();
-      $edit_link = Link::fromTextAndUrl(
-        $this->t('Edit'),
-        Url::fromRoute('esim_research_migration.proposal_edit_form', ['proposal_id' => $proposal_data->id])
-      )->toString();
-
       $proposal_rows[] = [
-        date('d-m-Y', $proposal_data->creation_date),
-        Markup::create(Link::fromTextAndUrl(
-          $proposal_data->contributor_name,
-          Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid])
-        )->toString()),
-        $proposal_data->project_title,
-        $approval_date,
-        $actual_completion_date,
-        $approval_status,
-        Markup::create($status_link . ' | ' . $edit_link),
+        ['data' => ['#plain_text' => date('d-m-Y', $proposal_data->creation_date)]],
+        [
+          'data' => Link::fromTextAndUrl(
+            $proposal_data->contributor_name,
+            Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid])
+          )->toRenderable(),
+        ],
+        ['data' => ['#plain_text' => $proposal_data->project_title]],
+        ['data' => ['#plain_text' => $approval_date]],
+        ['data' => ['#plain_text' => $actual_completion_date]],
+        ['data' => ['#plain_text' => $approval_status]],
+        [
+          'data' => [
+            '#type' => 'inline_template',
+            '#template' => '{{ status }} | {{ edit }}',
+            '#context' => [
+              'status' => Link::fromTextAndUrl(
+                $this->t('Status'),
+                Url::fromRoute('esim_research_migration.proposal_status_form', ['proposal_id' => $proposal_data->id])
+              )->toRenderable(),
+              'edit' => Link::fromTextAndUrl(
+                $this->t('Edit'),
+                Url::fromRoute('esim_research_migration.proposal_edit_form', ['proposal_id' => $proposal_data->id])
+              )->toRenderable(),
+            ],
+          ],
+        ],
       ];
     }
 
@@ -156,6 +171,10 @@ class DefaultController extends ControllerBase {
       '#rows' => $proposal_rows,
       '#attributes' => ['class' => ['proposal-table']],
       '#empty' => $this->t('No proposals found.'),
+      '#cache' => [
+        'tags' => ['research_migration_proposal_list'],
+        'contexts' => ['user.permissions'],
+      ],
     ];
   }
 
@@ -206,24 +225,24 @@ public function esim_research_migration_proposal_edit_file_all() {
 
     $submission_date = date('d-m-Y', $proposal_data->creation_date);
 
-    $user_link = Link::fromTextAndUrl(
-      $proposal_data->contributor_name,
-      Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid])
-    )->toString();
-
-    $edit_link = Link::fromTextAndUrl(
-      $this->t('Edit'),
-      Url::fromRoute('esim_research_migration.edit_upload_abstract_code_form', [], ['query' => ['proposal_id' => $proposal_data->id]])
-    )->toString();
-
     $proposal_rows[] = [
-      ['data' => $submission_date],
-      ['data' => Markup::create($user_link)],
-      ['data' => $proposal_data->project_title],
-      ['data' => $approval_date],
-      ['data' => $actual_completion_date],
-      ['data' => $approval_status],
-      ['data' => Markup::create($edit_link)],
+      ['data' => ['#plain_text' => $submission_date]],
+      [
+        'data' => Link::fromTextAndUrl(
+          $proposal_data->contributor_name,
+          Url::fromRoute('entity.user.canonical', ['user' => $proposal_data->uid])
+        )->toRenderable(),
+      ],
+      ['data' => ['#plain_text' => $proposal_data->project_title]],
+      ['data' => ['#plain_text' => $approval_date]],
+      ['data' => ['#plain_text' => $actual_completion_date]],
+      ['data' => ['#plain_text' => $approval_status]],
+      [
+        'data' => Link::fromTextAndUrl(
+          $this->t('Edit'),
+          Url::fromRoute('esim_research_migration.edit_upload_abstract_code_form', [], ['query' => ['proposal_id' => $proposal_data->id]])
+        )->toRenderable(),
+      ],
     ];
   }
 
@@ -249,13 +268,16 @@ public function esim_research_migration_proposal_edit_file_all() {
     '#header' => $proposal_header,
     '#rows' => $proposal_rows,
     '#empty' => t('No proposals found.'),
+    '#cache' => [
+      'tags' => ['research_migration_proposal_list'],
+      'contexts' => ['user.permissions'],
+    ],
   ];
 }
 
 
  public function esim_research_migration_abstract() {
   $user = \Drupal::currentUser();
-  $return_html = "";
   $proposal_data = esim_research_migration_get_proposal();
 
   if (!$proposal_data) {
@@ -298,37 +320,60 @@ public function esim_research_migration_proposal_edit_file_all() {
     ->fetchObject();
 
   $abstracts_query_process_filename = 'File not uploaded';
-  $url = '';
+  $action_link_render = NULL;
 
   if ($abstracts_query_process && !empty($abstracts_query_process->filename) && $abstracts_query_process->filename !== 'NULL') {
     $abstracts_query_process_filename = $abstracts_query_process->filename;
 
     if (!empty($abstracts_q)) {
       if ($abstracts_q->is_submitted == 0) {
-        $url = Link::fromTextAndUrl(
+        $action_link_render = Link::fromTextAndUrl(
           $this->t('Edit'),
           Url::fromRoute('esim_research_migration.upload_abstract_code_form')
-        )->toString();
+        )->toRenderable();
       }
     }
   } else {
-    $url = Link::fromTextAndUrl(
+    $action_link_render = Link::fromTextAndUrl(
       $this->t('Upload Case Directory'),
       Url::fromRoute('esim_research_migration.upload_abstract_code_form')
-    )->toString();
+    )->toRenderable();
   }
 
-  // Build HTML output
-  $return_html .= '<strong>Contributor Name:</strong><br />' . $proposal_data->name_title . ' ' . $proposal_data->contributor_name . '<br /><br />';
-  $return_html .= '<strong>Title of the Research Migration Project:</strong><br />' . $proposal_data->project_title . '<br /><br />';
-  $return_html .= '<strong>Uploaded Synopsis Submission:</strong><br />' . $abstract_filename . '<br /><br />';
-  $return_html .= '<strong>Uploaded Case Directory:</strong><br />' . $abstracts_query_process_filename . '<br /><br />';
-  $return_html .= $url . '<br />';
+  $rows = [
+    [
+      ['data' => ['#plain_text' => $this->t('Contributor Name')]],
+      ['data' => ['#plain_text' => $proposal_data->name_title . ' ' . $proposal_data->contributor_name]],
+    ],
+    [
+      ['data' => ['#plain_text' => $this->t('Title of the Research Migration Project')]],
+      ['data' => ['#plain_text' => $proposal_data->project_title]],
+    ],
+    [
+      ['data' => ['#plain_text' => $this->t('Uploaded Synopsis Submission')]],
+      ['data' => ['#plain_text' => $abstract_filename]],
+    ],
+    [
+      ['data' => ['#plain_text' => $this->t('Uploaded Case Directory')]],
+      ['data' => ['#plain_text' => $abstracts_query_process_filename]],
+    ],
+  ];
+
+  if (!empty($action_link_render)) {
+    $rows[] = [
+      ['data' => ['#plain_text' => $this->t('Action')]],
+      ['data' => $action_link_render],
+    ];
+  }
 
   return [
-    '#type' => 'markup',
-    '#markup' => $return_html,
-    '#allowed_tags' => ['strong', 'br', 'a', 'div'], // optional: improve sanitization
+    '#type' => 'table',
+    '#header' => [$this->t('Field'), $this->t('Value')],
+    '#rows' => $rows,
+    '#cache' => [
+      'tags' => ['research_migration_proposal:' . $proposal_data->id],
+      'contexts' => ['user'],
+    ],
   ];
 }
 
@@ -352,9 +397,15 @@ public function esim_research_migration_proposal_edit_file_all() {
       return $this->redirect('esim_research_migration.proposal_all');
     }
 
+    $file_system = \Drupal::service('file_system');
     $root_path = rtrim(esim_research_migration_path(), '/') . '/';
     $directory_name = trim($proposal->directory_name, '/');
-    $zip_filename = $root_path . 'zip-' . time() . '-' . random_int(0, 999999) . '.zip';
+    if ($directory_name === '') {
+      $this->messenger()->addError($this->t('Invalid proposal directory.'));
+      return $this->redirect('esim_research_migration.proposal_all');
+    }
+
+    $zip_filename = $file_system->tempnam($file_system->getTempDirectory(), 'rm_zip_') . '.zip';
 
     $zip = new ZipArchive();
     if ($zip->open($zip_filename, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
@@ -388,6 +439,8 @@ public function esim_research_migration_proposal_edit_file_all() {
     $response = new BinaryFileResponse($zip_filename);
     $response->setContentDisposition('attachment', $download_name);
     $response->deleteFileAfterSend(TRUE);
+    $response->setPrivate();
+    $response->headers->addCacheControlDirective('max-age', 0);
 
     return $response;
   }
@@ -403,25 +456,20 @@ public function esim_research_migration_proposal_edit_file_all() {
     $counter = count($records);
     foreach ($records as $row) {
       $year = $row->actual_completion_date ? date('Y', $row->actual_completion_date) : $this->t('NA');
-      $project_link = Link::fromTextAndUrl(
-        $row->project_title,
-        Url::fromRoute('esim_research_migration.run_form_with_id', ['proposal_id' => $row->id])
-      )->toString();
-
       $rows[] = [
-        $counter,
-        Markup::create($project_link),
-        $row->contributor_name,
-        $row->institute,
-        $year,
+        ['data' => ['#plain_text' => $counter]],
+        [
+          'data' => Link::fromTextAndUrl(
+            $row->project_title,
+            Url::fromRoute('esim_research_migration.run_form_with_id', ['proposal_id' => $row->id])
+          )->toRenderable(),
+        ],
+        ['data' => ['#plain_text' => $row->contributor_name]],
+        ['data' => ['#plain_text' => $row->institute]],
+        ['data' => ['#plain_text' => $year]],
       ];
       $counter--;
     }
-
-    $proposal_link = Link::fromTextAndUrl(
-      $this->t('here'),
-      Url::fromRoute('esim_research_migration.proposal_form')
-    )->toString();
 
     return [
       '#theme' => 'table',
@@ -434,10 +482,21 @@ public function esim_research_migration_proposal_edit_file_all() {
         $this->t('Year of Completion'),
       ],
       '#rows' => $rows,
-      '#empty' => Markup::create($this->t('Currently, there are no submissions in this section. Click @link to propose a Research Migration Project.', [
-        '@link' => $proposal_link,
-      ])),
+      '#empty' => [
+        '#type' => 'inline_template',
+        '#template' => 'Currently, there are no submissions in this section. Click {{ link }} to propose a Research Migration Project.',
+        '#context' => [
+          'link' => Link::fromTextAndUrl(
+            $this->t('here'),
+            Url::fromRoute('esim_research_migration.proposal_form')
+          )->toRenderable(),
+        ],
+      ],
       '#attributes' => ['class' => ['research-migration-completed-table']],
+      '#cache' => [
+        'tags' => ['research_migration_proposal_list'],
+        'contexts' => ['user.permissions'],
+      ],
     ];
   }
 
@@ -453,11 +512,11 @@ public function esim_research_migration_proposal_edit_file_all() {
     foreach ($results as $row) {
       $approval_year = $row->approval_date ? date('Y', $row->approval_date) : $this->t('NA');
       $rows[] = [
-        $counter,
-        $row->project_title,
-        $row->contributor_name,
-        $row->institute,
-        $approval_year,
+        ['data' => ['#plain_text' => $counter]],
+        ['data' => ['#plain_text' => $row->project_title]],
+        ['data' => ['#plain_text' => $row->contributor_name]],
+        ['data' => ['#plain_text' => $row->institute]],
+        ['data' => ['#plain_text' => $approval_year]],
       ];
       $counter--;
     }
@@ -482,31 +541,42 @@ public function esim_research_migration_proposal_edit_file_all() {
       //   '@link' => $proposal_link,
       // ])),
       '#attributes' => ['class' => ['research-migration-progress-table']],
+      '#cache' => [
+        'tags' => ['research_migration_proposal_list'],
+        'contexts' => ['user.permissions'],
+      ],
     ];
   }
 
   public function list_of_available_project_titles() {
     $preference_rows = [];
     $i = 1;
-    $query = \Drupal::database()->query("SELECT * from rm_list_of_project_titles WHERE {rm_project_title_name} NOT IN( SELECT  project_title from research_migration_proposal WHERE approval_status = 0 OR approval_status = 1 OR approval_status = 3)");
-    while ($result = $query->fetchObject()) {
-      $link = '';
-      if (!empty($result->rm_project_link)) {
-        $link = Link::fromTextAndUrl(
+    $query = \Drupal::database()->select('rm_list_of_project_titles', 't');
+    $query->fields('t');
+    $query->leftJoin('research_migration_proposal', 'p', 'p.project_title = t.rm_project_title_name AND p.approval_status IN (0, 1, 3)');
+    $query->isNull('p.id');
+    $results = $query->execute();
+
+    foreach ($results as $result) {
+      $link_render = ['#plain_text' => ''];
+      $raw_link = (string) ($result->rm_project_link ?? '');
+      $safe_link = UrlHelper::stripDangerousProtocols($raw_link);
+      if ($safe_link !== '' && UrlHelper::isValid($safe_link, TRUE)) {
+        $link_render = Link::fromTextAndUrl(
           $this->t('Click Here'),
-          Url::fromUri($result->rm_project_link, ['attributes' => ['target' => '_blank', 'rel' => 'noopener noreferrer']])
-        )->toString();
+          Url::fromUri($safe_link, ['attributes' => ['target' => '_blank', 'rel' => 'noopener noreferrer']])
+        )->toRenderable();
       }
       $download_link = Link::fromTextAndUrl(
         $this->t('Download'),
         Url::fromRoute('esim_research_migration.download_research_migration_project_title_files', ['project_title_id' => $result->id])
-      )->toString();
+      )->toRenderable();
 
       $preference_rows[] = [
-        $i,
-        $result->rm_project_title_name,
-        Markup::create($link),
-        Markup::create($download_link),
+        ['data' => ['#plain_text' => $i]],
+        ['data' => ['#plain_text' => $result->rm_project_title_name]],
+        ['data' => $link_render],
+        ['data' => $download_link],
       ];
       $i++;
     }
@@ -521,6 +591,10 @@ public function esim_research_migration_proposal_edit_file_all() {
       '#rows' => $preference_rows,
       '#empty' => $this->t('No project titles available at the moment.'),
       '#attributes' => ['class' => ['research-migration-project-titles-table']],
+      '#cache' => [
+        'tags' => ['rm_list_of_project_titles_list', 'research_migration_proposal_list'],
+        'contexts' => ['user.permissions'],
+      ],
     ];
   }
 
@@ -552,6 +626,8 @@ public function esim_research_migration_proposal_edit_file_all() {
 
     $response = new BinaryFileResponse($file_path);
     $response->setContentDisposition('attachment', basename($file_path));
+    $response->setPrivate();
+    $response->headers->addCacheControlDirective('max-age', 0);
     return $response;
   }
 
@@ -583,6 +659,8 @@ public function esim_research_migration_proposal_edit_file_all() {
 
     $response = new BinaryFileResponse($file_path);
     $response->setContentDisposition('attachment', basename($file_path));
+    $response->setPrivate();
+    $response->headers->addCacheControlDirective('max-age', 0);
     return $response;
   }
 
@@ -594,14 +672,15 @@ public function esim_research_migration_proposal_edit_file_all() {
 
     $rows = [];
     foreach ($proposals as $proposal) {
-      $certificate_link = Link::fromTextAndUrl(
-        $this->t('Download Certificate'),
-        Url::fromRoute('esim_research_migration.generate_pdf', ['proposal_id' => $proposal->id])
-      )->toString();
       $rows[] = [
-        $proposal->project_title,
-        $proposal->contributor_name,
-        Markup::create($certificate_link),
+        ['data' => ['#plain_text' => $proposal->project_title]],
+        ['data' => ['#plain_text' => $proposal->contributor_name]],
+        [
+          'data' => Link::fromTextAndUrl(
+            $this->t('Download Certificate'),
+            Url::fromRoute('esim_research_migration.generate_pdf', ['proposal_id' => $proposal->id])
+          )->toRenderable(),
+        ],
       ];
     }
 
@@ -610,7 +689,7 @@ public function esim_research_migration_proposal_edit_file_all() {
 
       return [
         '#type' => 'markup',
-        '#markup' => Markup::create('<span style="color:red;">' . $this->t('No certificate available.') . '</span>'),
+        '#markup' => '<span style="color:red;">' . $this->t('No certificate available.') . '</span>',
       ];
     }
 
@@ -623,6 +702,10 @@ public function esim_research_migration_proposal_edit_file_all() {
       ],
       '#rows' => $rows,
       '#attributes' => ['class' => ['research-migration-certificates-table']],
+      '#cache' => [
+        'tags' => ['research_migration_proposal_list'],
+        'contexts' => ['user'],
+      ],
     ];
   }
 
@@ -754,6 +837,8 @@ public function esim_research_migration_proposal_edit_file_all() {
     $response = new BinaryFileResponse($pdf_file);
     $response->setContentDisposition('attachment', $download_filename);
     $response->deleteFileAfterSend(TRUE);
+    $response->setPrivate();
+    $response->headers->addCacheControlDirective('max-age', 0);
     return $response;
   }
 
@@ -773,7 +858,7 @@ public function esim_research_migration_proposal_edit_file_all() {
       if (!$proposal_id) {
         return [
           '#type' => 'markup',
-          '#markup' => Markup::create('<b>' . $this->t('Sorry! The QR code you entered seems to be invalid. Please try again.') . '</b>'),
+          '#markup' => '<b>' . $this->t('Sorry! The QR code you entered seems to be invalid. Please try again.') . '</b>',
         ];
       }
 
@@ -787,7 +872,7 @@ public function esim_research_migration_proposal_edit_file_all() {
       if (!$proposal) {
         return [
           '#type' => 'markup',
-          '#markup' => Markup::create('<b>' . $this->t('Certificate details not available.') . '</b>'),
+          '#markup' => '<b>' . $this->t('Certificate details not available.') . '</b>',
         ];
       }
 
@@ -805,6 +890,10 @@ public function esim_research_migration_proposal_edit_file_all() {
         '#header' => [$this->t('Field'), $this->t('Value')],
         '#rows' => $rows,
         '#caption' => $this->t('Participation Details'),
+        '#cache' => [
+          'tags' => ['research_migration_proposal:' . (int) $proposal_id],
+          'contexts' => ['user.permissions'],
+        ],
       ];
     }
 
@@ -881,6 +970,8 @@ public function esim_research_migration_proposal_edit_file_all() {
 
     $response = new BinaryFileResponse($file_path);
     $response->setContentDisposition('attachment', basename($file_path));
+    $response->setPrivate();
+    $response->headers->addCacheControlDirective('max-age', 0);
     return $response;
   }
 
