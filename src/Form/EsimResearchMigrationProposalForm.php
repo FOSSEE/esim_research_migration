@@ -22,6 +22,8 @@ use Drupal\Core\Database\Database;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Mail\MailManager;
 use Drupal\user\Entity\User;
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\File\FileSystemInterface;
 
 
 class EsimResearchMigrationProposalForm extends FormBase {
@@ -342,10 +344,10 @@ class EsimResearchMigrationProposalForm extends FormBase {
   public function validateForm(array &$form, FormStateInterface $form_state) {
     //var_dump($form_state['values']['solver_used']);die;
 
-    if ($form_state->getValue(['term_condition']) == '1') {
-      $form_state->setErrorByName('term_condition', t('Please check the terms and conditions'));
-      // $form_state['values']['country'] = $form_state['values']['other_country'];
-    } //$form_state['values']['term_condition'] == '1'
+    $terms = $form_state->getValue('term_condition');
+    if (empty($terms['status'])) {
+      $form_state->setErrorByName('term_condition', $this->t('Please check the terms and conditions'));
+    }
     if ($form_state->getValue([
       'country'
       ]) == 'Others') {
@@ -422,9 +424,9 @@ class EsimResearchMigrationProposalForm extends FormBase {
     }
 
 
-    if (isset($_FILES['files'])) {
+    if (isset($_FILES['files']['name']) && is_array($_FILES['files']['name'])) {
       /* check if atleast one source or result file is uploaded */
-      if (!($_FILES['files']['name']['samplefile_path'])) {
+      if (empty($_FILES['files']['name']['samplefile_path'])) {
         $form_state->setErrorByName('samplefilepath', t('Please upload the Synopsis file'));
       }
       /* check for valid filename extensions */
@@ -435,19 +437,18 @@ class EsimResearchMigrationProposalForm extends FormBase {
 // // @FIXME
 // // This looks like another module's variable. You'll need to rewrite this call
 // // to ensure that it uses the correct configuration object.
-$allowed_extensions_str = \Drupal::config('esim_research_migration.settings')->get('resource_upload_extensions');
-
-          $allowed_extensions = explode(',', $allowed_extensions_str);
-          $fnames = explode('.', strtolower($_FILES['files']['name'][$file_form_name]));
+          $allowed_extensions_str = (string) \Drupal::config('esim_research_migration.settings')->get('resource_upload_extensions');
+          $allowed_extensions = array_filter(array_map('trim', explode(',', $allowed_extensions_str)));
+          $fnames = explode('.', strtolower((string) $_FILES['files']['name'][$file_form_name]));
           $temp_extension = end($fnames);
-          if (!in_array($temp_extension, $allowed_extensions)) {
+          if ($allowed_extensions && !in_array($temp_extension, $allowed_extensions, TRUE)) {
             $form_state->setErrorByName($file_form_name, t('Only file with ' . $allowed_extensions_str . ' extensions can be uploaded.'));
           }
-          if ($_FILES['files']['size'][$file_form_name] <= 0) {
+          if (!empty($_FILES['files']['size'][$file_form_name]) && $_FILES['files']['size'][$file_form_name] <= 0) {
             $form_state->setErrorByName($file_form_name, t('File size cannot be zero.'));
           }
           /* check if valid file name */
-          if (!esim_research_migration_check_valid_filename($_FILES['files']['name'][$file_form_name])) {
+          if (!esim_research_migration_check_valid_filename((string) $_FILES['files']['name'][$file_form_name])) {
             $form_state->setErrorByName($file_form_name, t('Invalid file name specified. Only alphabets and numbers are allowed as a valid filename.'));
           }
         } //$file_name
@@ -482,90 +483,36 @@ $allowed_extensions_str = \Drupal::config('esim_research_migration.settings')->g
     $proposar_name = $v['name_title'] . ' ' . $v['contributor_name'];
     $university = $v['university'];
     $directory_name = _rm_dir_name($project_title, $proposar_name);
-    $result = "INSERT INTO {research_migration_proposal} 
-    (
-    uid, 
-    approver_uid,
-    name_title, 
-    contributor_name,
-    contact_no,
-    university,
-    institute,
-    how_did_you_know_about_project,
-    faculty_name,
-    faculty_department,
-    faculty_email,
-    city, 
-    pincode, 
-    state, 
-    country,
-    project_title, 
-	source_of_the_project,
-    directory_name,
-    approval_status,
-    is_completed, 
-    dissapproval_reason,
-    creation_date, 
-    expected_date_of_completion,
-    approval_date,
-	samplefilepath
-    ) VALUES
-    (
-    :uid, 
-    :approver_uid, 
-    :name_title, 
-    :contributor_name, 
-    :contact_no,
-    :university, 
-    :institute,
-    :how_did_you_know_about_project,
-    :faculty_name,
-    :faculty_department,
-    :faculty_email,
-    :city, 
-    :pincode, 
-    :state,  
-    :country,
-    :project_title,
-	:source_of_the_project, 
-    :directory_name,
-    :approval_status,
-    :is_completed, 
-    :dissapproval_reason,
-    :creation_date, 
-    :expected_date_of_completion,
-    :approval_date,
-	:samplefilepath
-    )";
-    $args = [
-      ":uid" => $user->get('uid')->value,
-      ":approver_uid" => 0,
-      ":name_title" => $v['name_title'],
-      ":contributor_name" => $this->_df_sentence_case(trim($v['contributor_name'])),
-      ":contact_no" => $v['contributor_contact_no'],
-      ":university" => $v['university'],
-      ":institute" => $this->_df_sentence_case($v['institute']),
-      ":how_did_you_know_about_project" => trim($how_did_you_know_about_project),
-      ":faculty_name" => $v['faculty_name'],
-      ":faculty_department" => $v['faculty_department'],
-      ":faculty_email" => $v['faculty_email'],
-      ":city" => $v['city'],
-      ":pincode" => $v['pincode'],
-      ":state" => $v['all_state'],
-      ":country" => $v['country'],
-      ":project_title" => $project_title,
-      ":source_of_the_project" => trim($v['source_of_the_project']),
-      ":directory_name" => $directory_name,
-      ":approval_status" => 0,
-      ":is_completed" => 0,
-      ":dissapproval_reason" => "NULL",
-      ":creation_date" => time(),
-      ":expected_date_of_completion" => strtotime(date($v['expected_date_of_completion'])),
-      ":approval_date" => 0,
-      ":samplefilepath" => "",
-    ];
+    $expected_date = (string) $v['expected_date_of_completion'];
+    $expected_timestamp = $expected_date !== '' ? strtotime($expected_date) : 0;
     $connection = Database::getConnection();
-$result1 = $connection->insert('research_migration_proposal')->fields($args)->execute();
+    $result1 = $connection->insert('research_migration_proposal')->fields([
+      "uid" => $user->id(),
+      "approver_uid" => 0,
+      "name_title" => $v['name_title'],
+      "contributor_name" => $this->_df_sentence_case(trim($v['contributor_name'])),
+      "contact_no" => $v['contributor_contact_no'],
+      "university" => $v['university'],
+      "institute" => $this->_df_sentence_case($v['institute']),
+      "how_did_you_know_about_project" => trim($how_did_you_know_about_project),
+      "faculty_name" => $v['faculty_name'],
+      "faculty_department" => $v['faculty_department'],
+      "faculty_email" => $v['faculty_email'],
+      "city" => $v['city'],
+      "pincode" => $v['pincode'],
+      "state" => $v['all_state'],
+      "country" => $v['country'],
+      "project_title" => $project_title,
+      "source_of_the_project" => trim($v['source_of_the_project']),
+      "directory_name" => $directory_name,
+      "approval_status" => 0,
+      "is_completed" => 0,
+      "dissapproval_reason" => NULL,
+      "creation_date" => time(),
+      "expected_date_of_completion" => $expected_timestamp ?: 0,
+      "approval_date" => 0,
+      "samplefilepath" => "",
+    ])->execute();
     // $result1 = \Drupal::database()->query($result, $args)->execute();
     //var_dump($result1->id);die;
     // $query_pro = db_select('research_migration_proposal');
@@ -575,10 +522,10 @@ $result1 = $connection->insert('research_migration_proposal')->fields($args)->ex
     //	$proposal_id = $abstracts_pro->id;
     $dest_path = $directory_name . '/';
     $dest_path1 = $root_path . $dest_path;
-    if (!is_dir($root_path . $dest_path)) {
-      mkdir($root_path . $dest_path);
-    }
+    $file_system = \Drupal::service('file_system');
+    $file_system->prepareDirectory($root_path . $dest_path, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
     /* uploading files */
+    if (isset($_FILES['files']['name']) && is_array($_FILES['files']['name'])) {
     foreach ($_FILES['files']['name'] as $file_form_name => $file_name) {
       if ($file_name) {
         /* checking file type */
@@ -590,7 +537,7 @@ $result1 = $connection->insert('research_migration_proposal')->fields($args)->ex
           //unlink($root_path . $dest_path . $_FILES['files']['name'][$file_form_name]);
         } //file_exists($root_path . $dest_path . $_FILES['files']['name'][$file_form_name])
 			/* uploading file */
-        if (move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . 'abstract_' . $_FILES['files']['name'][$file_form_name])) {
+        if (is_uploaded_file($_FILES['files']['tmp_name'][$file_form_name]) && move_uploaded_file($_FILES['files']['tmp_name'][$file_form_name], $root_path . $dest_path . 'abstract_' . $_FILES['files']['name'][$file_form_name])) {
           $query = "UPDATE {research_migration_proposal} SET samplefilepath = :samplefilepath WHERE id = :id";
           $args = [
             ":samplefilepath" => $dest_path . 'abstract_' . $_FILES['files']['name'][$file_form_name],
@@ -607,6 +554,7 @@ $result1 = $connection->insert('research_migration_proposal')->fields($args)->ex
         }
       } //$file_name
     } //$_FILES['files']['name'] as $file_form_name => $file_name
+    }
     if (!$result1) {
       \Drupal::messenger()->addError(t('Error receiving your proposal. Please try again.'));
       return;
@@ -639,6 +587,7 @@ $result1 = $connection->insert('research_migration_proposal')->fields($args)->ex
 
     $this->messenger()->addStatus($this->t('We have received your Research Migration proposal. We will get back to you soon.'));
     $form_state->setRedirect('<front>');
+    Cache::invalidateTags(['research_migration_proposal_list']);
  
   }
 

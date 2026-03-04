@@ -11,11 +11,14 @@ use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 use Drupal\Core\Ajax\AjaxResponse;
+use Drupal\Core\Ajax\CacheableAjaxResponse;
 use Drupal\Core\Ajax\HtmlCommand;
 use Drupal\Core\Ajax\ReplaceCommand;
 use Drupal\Core\Url;
 use Drupal\Core\Link;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Cache\CacheableMetadata;
+use Drupal\Core\Cache\Cache;
 
 
 class EsimResearchMigrationAbstractBulkApprovalForm extends FormBase {
@@ -43,6 +46,7 @@ public function buildForm(array $form, FormStateInterface $form_state) {
       'event' => 'change',
       'wrapper' => 'ajax_selected_research_migration_wrapper',
     ],
+    '#limit_validation_errors' => [],
     '#suffix' => '<div id="ajax_selected_research_migration_wrapper"><div id="ajax_selected_research_migration"></div><div id="ajax_selected_research_migration_pdf"></div></div>',
   ];
 // var_dump(_research_migration_details(10));die;
@@ -94,22 +98,27 @@ public function buildForm(array $form, FormStateInterface $form_state) {
  * AJAX callback for project selection.
  */
 public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, FormStateInterface $form_state) {
-  $response = new AjaxResponse();
+  $response = new CacheableAjaxResponse();
   $selected_project = $form_state->getValue('research_migration_project');
 
   if ($selected_project != 0) {
-    $details_markup = _research_migration_details($selected_project);
-
+    $details_build = _research_migration_details($selected_project);
+    $details_markup = \Drupal::service('renderer')->renderRoot($details_build);
     $response->addCommand(new HtmlCommand('#ajax_selected_research_migration', $details_markup));
 
     // Refresh the options in the second select box
     $form['research_migration_actions']['#options'] = _bulk_list_research_migration_actions();
-    $rendered_actions = \Drupal::service('renderer')->render($form['research_migration_actions']);
+    $rendered_actions = \Drupal::service('renderer')->renderRoot($form['research_migration_actions']);
     $response->addCommand(new ReplaceCommand('#ajax_selected_research_migration_action', $rendered_actions));
   }
   else {
     $response->addCommand(new HtmlCommand('#ajax_selected_research_migration', ''));
   }
+
+  $cache = (new CacheableMetadata())
+    ->setCacheTags(['research_migration_proposal:' . (int) $selected_project])
+    ->setCacheContexts(['user.permissions']);
+  $cache->applyTo($response);
 
   return $response;
 }
@@ -136,7 +145,19 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
           $cc = (string) $config->get('research_migration_cc_emails');
           $mail_manager = \Drupal::service('plugin.manager.mail');
           $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
-          $site_name = (string) \Drupal::config('system.site')->get('name');
+          $mail_headers = [
+            'From' => $from,
+            'MIME-Version' => '1.0',
+            'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
+            'Content-Transfer-Encoding' => '8Bit',
+            'X-Mailer' => 'Drupal',
+          ];
+          if (trim($cc) !== '') {
+            $mail_headers['Cc'] = $cc;
+          }
+          if (trim($bcc) !== '') {
+            $mail_headers['Bcc'] = $bcc;
+          }
           if ($form_state->getValue(['research_migration_actions']) == 1) {
             // approving entire project //
             $query = \Drupal::database()->select('research_migration_submitted_abstracts');
@@ -157,83 +178,26 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
             } //$abstract_data = $abstracts_q->fetchObject()
             \Drupal::messenger()->addStatus(t('Approved Research Migration Project. Use the checkbox below to publish this Research Migration on the completed Research Migration page.'));
             $form_state->setRedirect('esim_research_migration.proposal_status_form', ['proposal_id' => $form_state->getValue(['research_migration_project'])]);
-            // email 
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been approved', array(
-            // 						'!site_name' => variable_get('site_name', '')
-            // 					));
-
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $email_body = array(
-            // 						0 => t('
-            // 
-            // Dear ' . $user_info->contributor_name . ',
-            // 
-            // Your uploaded project files for the Research Migration project has been approved.
-            // 
-            // Title of Research Migration project  : ' . $user_info->project_title . '
-            // 
-            // Best Wishes,
-            // 
-            // !site_name Team,
-            // FOSSEE,IIT Bombay', array(
-            // 							'!site_name' => variable_get('site_name', ''),
-            // 							'!user_name' => $user_data->name
-            // 						))
-            // 					);
-
-            /** sending email when everything done **/
-            $email_to = $user_data ? $user_data->getEmail() : '';
-            $email_subject = $this->t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been approved', ['!site_name' => $site_name]);
-            $email_body = [
-              $this->t('Dear @name,', ['@name' => $user_info->contributor_name]),
-              '',
-              $this->t('Your uploaded project files for the Research Migration project have been approved.'),
-              $this->t('Title of Research Migration project: @title', ['@title' => $user_info->project_title]),
-              '',
-              $this->t('Best Wishes,'),
-              $this->t('@site_name Team,', ['@site_name' => $site_name]),
-              $this->t('FOSSEE, IIT Bombay'),
-            ];
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $from = variable_get('research_migration_from_email', '');
-
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $bcc = variable_get('research_migration_emails', '');
-
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $cc = variable_get('research_migration_cc_emails', '');
-
-            $params['standard']['subject'] = $email_subject;
-            $params['standard']['body'] = $email_body;
-            $params['standard']['headers'] = [
-              'From' => $from,
-              'MIME-Version' => '1.0',
-              'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-              'Content-Transfer-Encoding' => '8Bit',
-              'X-Mailer' => 'Drupal',
-              'Cc' => $cc,
-              'Bcc' => $bcc,
-            ];
-            $mail_result = $mail_manager->mail('esim_research_migration', 'standard', $email_to, $langcode, $params, $from, TRUE);
-            if (empty($mail_result['result'])) {
-              $msg = \Drupal::messenger()->addError('Error sending email message.');
-            } //!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)
+            $email_to = $user_data ? (string) $user_data->getEmail() : '';
+            if ($email_to !== '') {
+              $params = [
+                'research_migration_abstract_bulk_approved' => [
+                  'contributor_name' => (string) ($user_info->contributor_name ?? ''),
+                  'project_title' => (string) ($user_info->project_title ?? ''),
+                  'headers' => $mail_headers,
+                ],
+              ];
+              $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_abstract_bulk_approved', $email_to, $langcode, $params, $from, TRUE);
+              if (empty($mail_result['result'])) {
+                $msg = \Drupal::messenger()->addError('Error sending email message.');
+              }
+            }
+            Cache::invalidateTags([
+              'research_migration_proposal_list',
+              'research_migration_proposal:' . (int) $form_state->getValue(['research_migration_project']),
+              'research_migration_submitted_abstracts_list',
+              'research_migration_submitted_abstracts_file_list',
+            ]);
           } //$form_state['values']['research_migration_actions'] == 1
           elseif ($form_state->getValue(['research_migration_actions']) == 2) {
             //pending review entire project 
@@ -257,84 +221,27 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
               ]);
             } //$abstract_data = $abstracts_q->fetchObject()
             \Drupal::messenger()->addStatus(t('The proposal has been marked for resubmission'));
-            // email 
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been marked as pending', array(
-            // 						'!site_name' => variable_get('site_name', '')
-            // 					));
-
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $email_body = array(
-            // 						0 => t('
-            // 
-            // Dear ' . $user_info->contributor_name . ',
-            // 
-            // Kindly resubmit the project files for the project : ' . $user_info->project_title . '.
-            // 
-            // Reason for resubmission: ' . $form_state['values']['message'] . '
-            // 
-            // Best Wishes,
-            // 
-            // !site_name Team,
-            // FOSSEE,IIT Bombay', array(
-            // 							'!site_name' => variable_get('site_name', ''),
-            // 							'!user_name' => $user_data->name
-            // 						))
-            // 					);
-
-            /** sending email when everything done **/
-            $email_to = $user_data ? $user_data->getEmail() : '';
-            $email_subject = $this->t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been marked for resubmission', ['!site_name' => $site_name]);
-            $email_body = [
-              $this->t('Dear @name,', ['@name' => $user_info->contributor_name]),
-              '',
-              $this->t('Your project files have been marked for resubmission. Please update your project files and resubmit.'),
-              $this->t('Project Title: @title', ['@title' => $user_info->project_title]),
-              trim((string) $form_state->getValue(['message'])) !== '' ? $this->t('Reason for resubmission: @reason', ['@reason' => $form_state->getValue(['message'])]) : '',
-              '',
-              $this->t('Best Wishes,'),
-              $this->t('@site_name Team,', ['@site_name' => $site_name]),
-              $this->t('FOSSEE, IIT Bombay'),
-            ];
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $from = variable_get('research_migration_from_email', '');
-
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $bcc = variable_get('research_migration_emails', '');
-
-            // @FIXME
-            // // @FIXME
-            // // This looks like another module's variable. You'll need to rewrite this call
-            // // to ensure that it uses the correct configuration object.
-            // $cc = variable_get('research_migration_cc_emails', '');
-
-            $params['standard']['subject'] = $email_subject;
-            $params['standard']['body'] = $email_body;
-            $params['standard']['headers'] = [
-              'From' => $from,
-              'MIME-Version' => '1.0',
-              'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-              'Content-Transfer-Encoding' => '8Bit',
-              'X-Mailer' => 'Drupal',
-              'Cc' => $cc,
-              'Bcc' => $bcc,
-            ];
-            $mail_result = $mail_manager->mail('esim_research_migration', 'standard', $email_to, $langcode, $params, $from, TRUE);
-            if (empty($mail_result['result'])) {
-              \Drupal::messenger()->addError('Error sending email message.');
-            } //!drupal_mail('research_migration', 'standard', $email_to, language_default(), $params, $from, TRUE)
+            $email_to = $user_data ? (string) $user_data->getEmail() : '';
+            if ($email_to !== '') {
+              $params = [
+                'research_migration_abstract_bulk_resubmission' => [
+                  'contributor_name' => (string) ($user_info->contributor_name ?? ''),
+                  'project_title' => (string) ($user_info->project_title ?? ''),
+                  'reason' => trim((string) $form_state->getValue(['message'])),
+                  'headers' => $mail_headers,
+                ],
+              ];
+              $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_abstract_bulk_resubmission', $email_to, $langcode, $params, $from, TRUE);
+              if (empty($mail_result['result'])) {
+                \Drupal::messenger()->addError('Error sending email message.');
+              }
+            }
+            Cache::invalidateTags([
+              'research_migration_proposal_list',
+              'research_migration_proposal:' . (int) $form_state->getValue(['research_migration_project']),
+              'research_migration_submitted_abstracts_list',
+              'research_migration_submitted_abstracts_file_list',
+            ]);
           } //$form_state['values']['research_migration_actions'] == 2
           elseif ($form_state->getValue(['research_migration_actions']) == 3) //disapprove and delete entire Research Migration project
  {
@@ -350,81 +257,27 @@ public function ajaxBulkResearchMigrationAbstractDetailsCallback(array &$form, F
             if (research_migration_abstract_delete_project($form_state->getValue(['research_migration_project']))) //////
  {
               \Drupal::messenger()->addStatus(t('Dis-Approved and Deleted Entire Research Migration project.'));
-              // @FIXME
-              // // @FIXME
-              // // This looks like another module's variable. You'll need to rewrite this call
-              // // to ensure that it uses the correct configuration object.
-              // $email_subject = t('[!site_name][Research Migration Project] Your uploaded Research Migration project have been marked as dis-approved', array(
-              // 						'!site_name' => variable_get('site_name', '')
-              // 					));
-
-              // @FIXME
-              // // @FIXME
-              // // This looks like another module's variable. You'll need to rewrite this call
-              // // to ensure that it uses the correct configuration object.
-              // $email_body = array(
-              // 						0 => t('
-              // Dear ' . $user_info->contributor_name . ',
-              // 
-              // We regret to inform you that the project files submitted for the Research Migration project title: ' . $user_info->project_title . ' are disapproved by the reviewer.
-              // 
-              // Reason for dis-approval: ' . $form_state['values']['message'] . '
-              // 
-              // Best Wishes,
-              // 
-              // !site_name Team,
-              // FOSSEE,IIT Bombay', array(
-              // 						'!site_name' => variable_get('site_name', ''),
-              // 						'!user_name' => $user_data->name
-              // 											))
-              // 					);
-
-              $email_to = $user_data ? $user_data->getEmail() : '';
-              $email_subject = $this->t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been disapproved', ['!site_name' => $site_name]);
-              $email_body = [
-                $this->t('Dear @name,', ['@name' => $user_info->contributor_name]),
-                '',
-                $this->t('We regret to inform you that the project files submitted for the Research Migration project have been disapproved by the reviewer.'),
-                $this->t('Project Title: @title', ['@title' => $user_info->project_title]),
-                $this->t('Reason for disapproval: @reason', ['@reason' => $form_state->getValue(['message'])]),
-                '',
-                $this->t('Best Wishes,'),
-                $this->t('@site_name Team,', ['@site_name' => $site_name]),
-                $this->t('FOSSEE, IIT Bombay'),
-              ];
-              // @FIXME
-              // // @FIXME
-              // // This looks like another module's variable. You'll need to rewrite this call
-              // // to ensure that it uses the correct configuration object.
-              // $from = variable_get('research_migration_from_email', '');
-
-              // @FIXME
-              // // @FIXME
-              // // This looks like another module's variable. You'll need to rewrite this call
-              // // to ensure that it uses the correct configuration object.
-              // $bcc = variable_get('research_migration_emails', '');
-
-              // @FIXME
-              // // @FIXME
-              // // This looks like another module's variable. You'll need to rewrite this call
-              // // to ensure that it uses the correct configuration object.
-              // $cc = variable_get('research_migration_cc_emails', '');
-
-              $params['standard']['subject'] = $email_subject;
-              $params['standard']['body'] = $email_body;
-              $params['standard']['headers'] = [
-                'From' => $from,
-                'MIME-Version' => '1.0',
-                'Content-Type' => 'text/plain; charset=UTF-8; format=flowed; delsp=yes',
-                'Content-Transfer-Encoding' => '8Bit',
-                'X-Mailer' => 'Drupal',
-                'Cc' => $cc,
-                'Bcc' => $bcc,
-              ];
-              $mail_result = $mail_manager->mail('esim_research_migration', 'standard', $email_to, $langcode, $params, $from, TRUE);
-              if (empty($mail_result['result'])) {
-                \Drupal::messenger()->addError('Error sending email message.');
+              $email_to = $user_data ? (string) $user_data->getEmail() : '';
+              if ($email_to !== '') {
+                $params = [
+                  'research_migration_abstract_bulk_disapproved' => [
+                    'contributor_name' => (string) ($user_info->contributor_name ?? ''),
+                    'project_title' => (string) ($user_info->project_title ?? ''),
+                    'reason' => trim((string) $form_state->getValue(['message'])),
+                    'headers' => $mail_headers,
+                  ],
+                ];
+                $mail_result = $mail_manager->mail('esim_research_migration', 'research_migration_abstract_bulk_disapproved', $email_to, $langcode, $params, $from, TRUE);
+                if (empty($mail_result['result'])) {
+                  \Drupal::messenger()->addError('Error sending email message.');
+                }
               }
+              Cache::invalidateTags([
+                'research_migration_proposal_list',
+                'research_migration_proposal:' . (int) $form_state->getValue(['research_migration_project']),
+                'research_migration_submitted_abstracts_list',
+                'research_migration_submitted_abstracts_file_list',
+              ]);
             } //research_migration_abstract_delete_project($form_state['values']['research_migration_project'])
             else {
               \Drupal::messenger()->addError(t('Error Dis-Approving and Deleting Entire Research Migration project.'));
@@ -481,23 +334,40 @@ function _research_migration_details($research_migration_proposal_id): array {
     ->execute()
     ->fetchObject();
 
-  // Download project link
   $download_link = Link::fromTextAndUrl(
     'Download Research Migration project',
     Url::fromUserInput('/research-migration-project/full-download/project/' . $research_migration_proposal_id)
-  )->toString();
-
-  $markup = <<<HTML
-<strong>Proposer Name:</strong><br />{$proposal->name_title} {$proposal->contributor_name}<br /><br />
-<strong>Title of the Research Migration Project:</strong><br />{$proposal->project_title}<br /><br />
-<strong>Uploaded an abstract (brief outline) of the project:</strong><br />{$abstract_filename}<br /><br />
-<strong>Uploaded Case Directory Folder:</strong><br />{$case_dir_filename}<br /><br />
-{$download_link}
-HTML;
+  )->toRenderable();
 
   return [
-    '#type' => 'markup',
-    '#markup' => Markup::create($markup),
+    '#type' => 'table',
+    '#header' => [t('Field'), t('Value')],
+    '#rows' => [
+      [
+        ['data' => ['#plain_text' => t('Proposer Name')]],
+        ['data' => ['#plain_text' => $proposal->name_title . ' ' . $proposal->contributor_name]],
+      ],
+      [
+        ['data' => ['#plain_text' => t('Title of the Research Migration Project')]],
+        ['data' => ['#plain_text' => $proposal->project_title]],
+      ],
+      [
+        ['data' => ['#plain_text' => t('Uploaded an abstract (brief outline) of the project')]],
+        ['data' => ['#plain_text' => $abstract_filename]],
+      ],
+      [
+        ['data' => ['#plain_text' => t('Uploaded Case Directory Folder')]],
+        ['data' => ['#plain_text' => $case_dir_filename]],
+      ],
+      [
+        ['data' => ['#plain_text' => t('Download')]],
+        ['data' => $download_link],
+      ],
+    ],
+    '#cache' => [
+      'tags' => ['research_migration_proposal:' . $research_migration_proposal_id],
+      'contexts' => ['user.permissions'],
+    ],
   ];
 }
 function _bulk_list_of_research_migration_project() {

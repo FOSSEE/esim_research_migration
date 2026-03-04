@@ -12,6 +12,7 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Link;
 use Drupal\Core\Url;
 use Drupal\Core\Render\Markup;
+use Drupal\Core\Cache\Cache;
 
 class EsimResearchMigrationProposalStatusForm extends FormBase {
 
@@ -89,11 +90,12 @@ class EsimResearchMigrationProposalStatusForm extends FormBase {
     //         '#title' => t('Student name'),
     //     );
 
+    $student_user = \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid);
+    $student_email = $student_user ? (string) $student_user->getEmail() : '';
     $form['student_email_id'] = [
-      '#title' => t('Student Email'),
       '#type' => 'item',
-      '#markup' => \Drupal::entityTypeManager()->getStorage('user')->load($proposal_data->uid)->mail,
-      '#title' => t('Email'),
+      '#markup' => $student_email !== '' ? $student_email : $this->t('Not available'),
+      '#title' => $this->t('Email'),
     ];
     $form['university'] = [
       '#type' => 'item',
@@ -191,7 +193,7 @@ class EsimResearchMigrationProposalStatusForm extends FormBase {
         $proposal_status = t('Completed');
         break;
       case 5:
-        $approval_status = t('On Hold');
+        $proposal_status = t('On Hold');
         break;
       default:
         $proposal_status = t('Unkown');
@@ -300,5 +302,6 @@ class EsimResearchMigrationProposalStatusForm extends FormBase {
       \Drupal::messenger()->addStatus('eSim Research Migration proposal has been marked completed. The contributor is notified of the Completion.');
     }
     $form_state->setRedirect('esim_research_migration.proposal_pending');
+    Cache::invalidateTags(['research_migration_proposal_list', 'research_migration_proposal:' . $proposal_id]);
   }
 }

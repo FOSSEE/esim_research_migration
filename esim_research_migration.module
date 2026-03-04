@@ -15,6 +15,7 @@ use Drupal\user\Entity\User;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Render\Markup;
+use Drupal\Component\Utility\Html;
 // $Id$
 require_once __DIR__ . '/general_deletion.inc';
 require_once __DIR__ . '/email.inc';
@@ -1121,7 +1122,7 @@ function edit_lecture_videos_form_submit($form, &$form_state) {
  * Implements hook_mail().
  */
 function esim_research_migration_mail($key, &$message, $params) {
-    $site_name = (string) \Drupal::config('system.site')->get('name');
+    $site_name = Html::escape((string) \Drupal::config('system.site')->get('name'));
     $message['body'] = $message['body'] ?? [];
 
     switch ($key) {
@@ -1275,6 +1276,71 @@ function esim_research_migration_mail($key, &$message, $params) {
                 $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
                 $message['body'][] = t('FOSSEE, IIT Bombay');
             }
+            break;
+        }
+
+        case 'research_migration_abstract_bulk_approved': {
+            $mail_data = $params['research_migration_abstract_bulk_approved'] ?? [];
+            $name = (string) ($mail_data['contributor_name'] ?? 'Contributor');
+            $title = (string) ($mail_data['project_title'] ?? '');
+            $message['headers'] = $mail_data['headers'] ?? [];
+            $message['subject'] = t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been approved', ['!site_name' => $site_name]);
+            $message['body'][] = t('Dear @name,', ['@name' => $name]);
+            $message['body'][] = '';
+            $message['body'][] = t('Your uploaded project files for the Research Migration project have been approved.');
+            if ($title !== '') {
+                $message['body'][] = t('Project Title: @title', ['@title' => $title]);
+            }
+            $message['body'][] = '';
+            $message['body'][] = t('Best Wishes,');
+            $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+            $message['body'][] = t('FOSSEE, IIT Bombay');
+            break;
+        }
+
+        case 'research_migration_abstract_bulk_resubmission': {
+            $mail_data = $params['research_migration_abstract_bulk_resubmission'] ?? [];
+            $name = (string) ($mail_data['contributor_name'] ?? 'Contributor');
+            $title = (string) ($mail_data['project_title'] ?? '');
+            $reason = trim((string) ($mail_data['reason'] ?? ''));
+            $message['headers'] = $mail_data['headers'] ?? [];
+            $message['subject'] = t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been marked for resubmission', ['!site_name' => $site_name]);
+            $message['body'][] = t('Dear @name,', ['@name' => $name]);
+            $message['body'][] = '';
+            $message['body'][] = t('Your project files have been marked for resubmission. Please update your project files and resubmit.');
+            if ($title !== '') {
+                $message['body'][] = t('Project Title: @title', ['@title' => $title]);
+            }
+            if ($reason !== '') {
+                $message['body'][] = t('Reason for resubmission: @reason', ['@reason' => $reason]);
+            }
+            $message['body'][] = '';
+            $message['body'][] = t('Best Wishes,');
+            $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+            $message['body'][] = t('FOSSEE, IIT Bombay');
+            break;
+        }
+
+        case 'research_migration_abstract_bulk_disapproved': {
+            $mail_data = $params['research_migration_abstract_bulk_disapproved'] ?? [];
+            $name = (string) ($mail_data['contributor_name'] ?? 'Contributor');
+            $title = (string) ($mail_data['project_title'] ?? '');
+            $reason = trim((string) ($mail_data['reason'] ?? ''));
+            $message['headers'] = $mail_data['headers'] ?? [];
+            $message['subject'] = t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been disapproved', ['!site_name' => $site_name]);
+            $message['body'][] = t('Dear @name,', ['@name' => $name]);
+            $message['body'][] = '';
+            $message['body'][] = t('We regret to inform you that the project files submitted for the Research Migration project have been disapproved by the reviewer.');
+            if ($title !== '') {
+                $message['body'][] = t('Project Title: @title', ['@title' => $title]);
+            }
+            if ($reason !== '') {
+                $message['body'][] = t('Reason for disapproval: @reason', ['@reason' => $reason]);
+            }
+            $message['body'][] = '';
+            $message['body'][] = t('Best Wishes,');
+            $message['body'][] = t('@site_name Team,', ['@site_name' => $site_name]);
+            $message['body'][] = t('FOSSEE, IIT Bombay');
             break;
         }
 
