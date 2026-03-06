@@ -82,7 +82,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['contributor_name'] = [
       '#type' => 'textfield',
       '#title' => t('Name of the contributor'),
-      '#size' => 250,
+      // '#size' => 250,
       '#attributes' => [
         'placeholder' => t('Enter your full name.....')
         ],
@@ -92,14 +92,14 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['contributor_email_id'] = [
       '#type' => 'textfield',
       '#title' => t('Email'),
-      '#size' => 30,
+      // '#size' => 30,
       '#value' => $user->getEmail(),
       '#disabled' => TRUE,
     ];
     $form['contributor_contact_no'] = [
       '#type' => 'textfield',
       '#title' => t('Contact No.'),
-      '#size' => 10,
+      // '#size' => 10,
       '#attributes' => [
         'placeholder' => t('Enter your contact number')
         ],
@@ -108,7 +108,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['university'] = [
       '#type' => 'textfield',
       '#title' => t('University'),
-      '#size' => 80,
+      // '#size' => 80,
       '#maxlength' => 200,
       '#required' => TRUE,
       '#attributes' => [
@@ -118,7 +118,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['institute'] = [
       '#type' => 'textfield',
       '#title' => t('Institute'),
-      '#size' => 80,
+      // '#size' => 80,
       '#maxlength' => 200,
       '#required' => TRUE,
       '#attributes' => [
@@ -152,7 +152,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['faculty_name'] = [
       '#type' => 'textfield',
       '#title' => t('Name of the Faculty Member of your Institution, if any, who helped you with this Research Migration Project'),
-      '#size' => 50,
+      // '#size' => 50,
       '#maxlength' => 50,
       '#validated' => TRUE,
       '#description' => t('<span style="color:red">Maximum character limit is 50</span>'),
@@ -160,7 +160,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['faculty_department'] = [
       '#type' => 'textfield',
       '#title' => t('Department of the Faculty Member of your Institution, if any, who helped you with this Research Migration Project'),
-      '#size' => 50,
+      // '#size' => 50,
       '#maxlength' => 50,
       '#validated' => TRUE,
       '#description' => t('<span style="color:red">Maximum character limit is 50</span>'),
@@ -168,7 +168,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['faculty_email'] = [
       '#type' => 'textfield',
       '#title' => t('Email id of the Faculty Member of your Institution, if any, who helped you with this Research Migration Project'),
-      '#size' => 255,
+      // '#size' => 255,
       '#maxlength' => 255,
       '#validated' => TRUE,
       '#description' => t('<span style="color:red">Maximum character limit is 255</span>'),
@@ -187,7 +187,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['other_country'] = [
       '#type' => 'textfield',
       '#title' => t('Other than India'),
-      '#size' => 100,
+      // '#size' => 100,
       '#attributes' => [
         'placeholder' => t('Enter your country name')
         ],
@@ -202,7 +202,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['other_state'] = [
       '#type' => 'textfield',
       '#title' => t('State other than India'),
-      '#size' => 100,
+      // '#size' => 100,
       '#attributes' => [
         'placeholder' => t('Enter your state/region name')
         ],
@@ -217,7 +217,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['other_city'] = [
       '#type' => 'textfield',
       '#title' => t('City other than India'),
-      '#size' => 100,
+      // '#size' => 100,
       '#attributes' => [
         'placeholder' => t('Enter your city name')
         ],
@@ -257,7 +257,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['pincode'] = [
       '#type' => 'textfield',
       '#title' => t('Pincode'),
-      '#size' => 6,
+      // '#size' => 6,
     ];
     /***************************************************************************/
     $form['hr'] = [
@@ -267,7 +267,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $form['project_title'] = [
       '#type' => 'textfield',
       '#title' => t('Title of the Research Migration Project'),
-      '#size' => 80,
+      // '#size' => 80,
       '#maxlength' => 250,
       '#description' => t('Maximum character limit is 250'),
       '#required' => TRUE,
@@ -296,7 +296,7 @@ class EsimResearchMigrationProposalForm extends FormBase {
 
     $form['samplefile']['samplefile_path'] = [
         '#type' => 'file',
-        '#size' => 48,
+        // '#size' => 48,
         '#description' => $this->t('<span style="color:red;">Upload filenames with allowed extensions only. No spaces or any special characters allowed in filename.</span>') 
             . '<br />' . $this->t('<span style="color:red;">Allowed file extensions: ') 
             . \Drupal::config('esim_research_migration.settings')->get('resource_upload_extensions') . '</span>',
@@ -523,7 +523,10 @@ class EsimResearchMigrationProposalForm extends FormBase {
     $dest_path = $directory_name . '/';
     $dest_path1 = $root_path . $dest_path;
     $file_system = \Drupal::service('file_system');
-    $file_system->prepareDirectory($root_path . $dest_path, FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS);
+  $file_system->prepareDirectory(
+  $dest_path1,
+  FileSystemInterface::CREATE_DIRECTORY | FileSystemInterface::MODIFY_PERMISSIONS
+);
     /* uploading files */
     if (isset($_FILES['files']['name']) && is_array($_FILES['files']['name'])) {
     foreach ($_FILES['files']['name'] as $file_form_name => $file_name) {

@@ -225,16 +225,24 @@ class EsimResearchMigrationProposalEditForm extends FormBase {
         }
       }
 
-      $this->messenger()->addStatus($this->t('The Research Migration proposal has been deleted.'));
-      if (_rm_rrmdir_project($proposal_id) === TRUE) {
-        $delete_query = $connection->delete('research_migration_proposal');
-        $delete_query->condition('id', $proposal_id);
-        $delete_query->execute();
-        $this->messenger()->addStatus($this->t('Proposal Deleted'));
-        $form_state->setRedirect('esim_research_migration.proposal_pending');
-        Cache::invalidateTags(['research_migration_proposal_list', 'research_migration_proposal:' . $proposal_id]);
-        return;
+      if (_rm_rrmdir_project($proposal_id) !== TRUE) {
+        $this->messenger()->addWarning($this->t('Project directory could not be deleted from disk. Continuing with proposal record deletion.'));
       }
+
+      $delete_query = $connection->delete('research_migration_proposal');
+      $delete_query->condition('id', $proposal_id);
+      $num_deleted = (int) $delete_query->execute();
+
+      if ($num_deleted > 0) {
+        $this->messenger()->addStatus($this->t('The Research Migration proposal has been deleted.'));
+      }
+      else {
+        $this->messenger()->addError($this->t('Unable to delete the proposal record.'));
+      }
+
+      $form_state->setRedirect('esim_research_migration.proposal_pending');
+      Cache::invalidateTags(['research_migration_proposal_list', 'research_migration_proposal:' . $proposal_id]);
+      return;
     }
 
     $values = $form_state->getValues();

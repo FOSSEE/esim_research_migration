@@ -1132,7 +1132,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
             $user = $user_id ? \Drupal::entityTypeManager()->getStorage('user')->load($user_id) : NULL;
             $message['headers'] = $params['research_migration_proposal_received']['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been received', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] Your Research Migration Project proposal has been received', ['@site_name' => $site_name]);
             if ($proposal_data && $user) {
                 $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
                 $message['body'][] = '';
@@ -1162,7 +1162,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
             $user = $user_id ? \Drupal::entityTypeManager()->getStorage('user')->load($user_id) : NULL;
             $message['headers'] = $params['research_migration_proposal_approved']['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been approved', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] Your Research Migration Project proposal has been approved', ['@site_name' => $site_name]);
             $url = \Drupal::request()->getSchemeAndHttpHost() . '/research-migration-project/abstract-code';
             if ($proposal_data && $user) {
                 $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
@@ -1185,7 +1185,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
             $user = $user_id ? \Drupal::entityTypeManager()->getStorage('user')->load($user_id) : NULL;
             $message['headers'] = $params['research_migration_proposal_disapproved']['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been disapproved', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] Your Research Migration Project proposal has been disapproved', ['@site_name' => $site_name]);
             if ($proposal_data && $user) {
                 $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
                 $message['body'][] = '';
@@ -1209,7 +1209,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $user_id = $params['research_migration_proposal_completed']['user_id'] ?? NULL;
             $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
             $message['headers'] = $params['research_migration_proposal_completed']['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project has been completed', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] Your Research Migration Project has been completed', ['@site_name' => $site_name]);
             if ($proposal_data) {
                 $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
                 $message['body'][] = '';
@@ -1227,7 +1227,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $proposal_id = $params['research_migration_proposal_deleted']['proposal_id'] ?? NULL;
             $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
             $message['headers'] = $params['research_migration_proposal_deleted']['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] Your Research Migration Project proposal has been deleted', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] Your Research Migration Project proposal has been deleted', ['@site_name' => $site_name]);
             if ($proposal_data) {
                 $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
                 $message['body'][] = '';
@@ -1245,7 +1245,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $proposal_id = $params['abstract_uploaded']['proposal_id'] ?? NULL;
             $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
             $message['headers'] = $params['abstract_uploaded']['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] You have uploaded Research Migration Project files', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] You have uploaded Research Migration Project files', ['@site_name' => $site_name]);
             if ($proposal_data) {
                 $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
                 $message['body'][] = '';
@@ -1265,7 +1265,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $proposal_id = $params['abstract_edit_file_uploaded']['proposal_id'] ?? NULL;
             $proposal_data = $proposal_id ? \Drupal::database()->select('research_migration_proposal')->fields('research_migration_proposal')->condition('id', $proposal_id)->range(0, 1)->execute()->fetchObject() : NULL;
             $message['headers'] = $params['abstract_edit_file_uploaded']['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] You have updated project files/synopsis of a Research Migration', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] You have updated project files/synopsis of a Research Migration', ['@site_name' => $site_name]);
             if ($proposal_data) {
                 $message['body'][] = t('Dear @name,', ['@name' => $proposal_data->contributor_name]);
                 $message['body'][] = '';
@@ -1284,7 +1284,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $name = (string) ($mail_data['contributor_name'] ?? 'Contributor');
             $title = (string) ($mail_data['project_title'] ?? '');
             $message['headers'] = $mail_data['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been approved', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] Your uploaded Research Migration project has been approved', ['@site_name' => $site_name]);
             $message['body'][] = t('Dear @name,', ['@name' => $name]);
             $message['body'][] = '';
             $message['body'][] = t('Your uploaded project files for the Research Migration project have been approved.');
@@ -1304,7 +1304,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $title = (string) ($mail_data['project_title'] ?? '');
             $reason = trim((string) ($mail_data['reason'] ?? ''));
             $message['headers'] = $mail_data['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been marked for resubmission', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] Your uploaded Research Migration project has been marked for resubmission', ['@site_name' => $site_name]);
             $message['body'][] = t('Dear @name,', ['@name' => $name]);
             $message['body'][] = '';
             $message['body'][] = t('Your project files have been marked for resubmission. Please update your project files and resubmit.');
@@ -1327,7 +1327,7 @@ function esim_research_migration_mail($key, &$message, $params) {
             $title = (string) ($mail_data['project_title'] ?? '');
             $reason = trim((string) ($mail_data['reason'] ?? ''));
             $message['headers'] = $mail_data['headers'] ?? [];
-            $message['subject'] = t('[!site_name][Research Migration Project] Your uploaded Research Migration project has been disapproved', ['!site_name' => $site_name]);
+            $message['subject'] = t('[@site_name][Research Migration Project] Your uploaded Research Migration project has been disapproved', ['@site_name' => $site_name]);
             $message['body'][] = t('Dear @name,', ['@name' => $name]);
             $message['body'][] = '';
             $message['body'][] = t('We regret to inform you that the project files submitted for the Research Migration project have been disapproved by the reviewer.');
