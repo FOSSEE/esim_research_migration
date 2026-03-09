@@ -77,6 +77,7 @@ class DefaultController extends ControllerBase {
       '#attributes' => ['class' => ['research-migration-pending-table']],
       '#empty' => $this->t('There are no pending proposals.'),
       '#cache' => [
+        'max-age' => 0,
         'tags' => ['research_migration_proposal_list'],
         'contexts' => ['user.permissions'],
       ],
@@ -172,6 +173,7 @@ class DefaultController extends ControllerBase {
       '#attributes' => ['class' => ['proposal-table']],
       '#empty' => $this->t('No proposals found.'),
       '#cache' => [
+        'max-age' => 0,
         'tags' => ['research_migration_proposal_list'],
         'contexts' => ['user.permissions'],
       ],
@@ -269,6 +271,7 @@ public function esim_research_migration_proposal_edit_file_all() {
     '#rows' => $proposal_rows,
     '#empty' => t('No proposals found.'),
     '#cache' => [
+      'max-age' => 0,
       'tags' => ['research_migration_proposal_list'],
       'contexts' => ['user.permissions'],
     ],
@@ -494,6 +497,7 @@ public function esim_research_migration_proposal_edit_file_all() {
       ],
       '#attributes' => ['class' => ['research-migration-completed-table']],
       '#cache' => [
+        'max-age' => 0,
         'tags' => ['research_migration_proposal_list'],
         'contexts' => ['user.permissions'],
       ],
@@ -542,6 +546,7 @@ public function esim_research_migration_proposal_edit_file_all() {
       // ])),
       '#attributes' => ['class' => ['research-migration-progress-table']],
       '#cache' => [
+        'max-age' => 0,
         'tags' => ['research_migration_proposal_list'],
         'contexts' => ['user.permissions'],
       ],
@@ -592,6 +597,7 @@ public function esim_research_migration_proposal_edit_file_all() {
       '#empty' => $this->t('No project titles available at the moment.'),
       '#attributes' => ['class' => ['research-migration-project-titles-table']],
       '#cache' => [
+        'max-age' => 0,
         'tags' => ['rm_list_of_project_titles_list', 'research_migration_proposal_list'],
         'contexts' => ['user.permissions'],
       ],
@@ -703,6 +709,7 @@ public function esim_research_migration_proposal_edit_file_all() {
       '#rows' => $rows,
       '#attributes' => ['class' => ['research-migration-certificates-table']],
       '#cache' => [
+        'max-age' => 0,
         'tags' => ['research_migration_proposal_list'],
         'contexts' => ['user'],
       ],
