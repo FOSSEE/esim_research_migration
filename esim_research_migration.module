@@ -530,6 +530,19 @@ function esim_research_migration_project_titles_resource_file_path()
 {
     return $_SERVER['DOCUMENT_ROOT'] . base_path() . 'esim_uploads/research_migration_titles_resource_files/';
 }
+function default_value_for_uploaded_files($filetype, $proposal_id)
+{
+    $query = \Drupal::database()->select('research_migration_submitted_abstracts_file');
+    $query->fields('research_migration_submitted_abstracts_file');
+    $query->condition('proposal_id', $proposal_id);
+
+    if ($filetype == "S" || $filetype == "A") {
+        $query->condition('filetype', $filetype);
+        return $query->execute()->fetchObject();
+    }
+
+    return;
+}
 /************************* USER VERIFICATION FUNCTIONS ************************/
 function esim_research_migration_get_proposal()
 {

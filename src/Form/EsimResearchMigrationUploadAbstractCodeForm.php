@@ -9,7 +9,6 @@ namespace Drupal\esim_research_migration\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element;
 use Drupal\Core\Cache\Cache;
 
 class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
@@ -68,10 +67,10 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
       '#markup' => $proposal_data->contributor_name,
       '#title' => t('Contributor Name'),
     ];
-    $existing_uploaded_A_file = default_value_for_uploaded_files("A", $proposal_data->id);
+    $existing_uploaded_A_file = $this->getUploadedFile('A', (int) $proposal_data->id);
     if (!$existing_uploaded_A_file) {
-      $existing_uploaded_A_file = new stdClass();
-      $existing_uploaded_A_file->filename = "No file uploaded";
+      $existing_uploaded_A_file = new \stdClass();
+      $existing_uploaded_A_file->filename = 'No file uploaded';
     } //!$existing_uploaded_S_file
     $config = \Drupal::config('esim_research_migration.settings');
     $abstract_extensions = (string) $config->get('research_migration_abstract_upload_extensions');
@@ -83,10 +82,10 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
       '#description' => $this->t('Current File: @file', ['@file' => $existing_uploaded_A_file->filename]) . '<br />' . $this->t('Allowed file extensions: @ext', ['@ext' => $abstract_extensions]),
     ];
 
-    $existing_uploaded_S_file = default_value_for_uploaded_files("S", $proposal_data->id);
+    $existing_uploaded_S_file = $this->getUploadedFile('S', (int) $proposal_data->id);
     if (!$existing_uploaded_S_file) {
-      $existing_uploaded_S_file = new stdClass();
-      $existing_uploaded_S_file->filename = "No file uploaded";
+      $existing_uploaded_S_file = new \stdClass();
+      $existing_uploaded_S_file->filename = 'No file uploaded';
     }
     $form['upload_research_migration_developed_process'] = [
       '#type' => 'file',
@@ -101,9 +100,6 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
     $form['submit'] = [
       '#type' => 'submit',
       '#value' => t('Submit'),
-      '#submit' => [
-        'esim_research_migration_upload_abstract_code_form_submit'
-        ],
     ];
 
     // @FIXME
@@ -119,12 +115,9 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
   public function validateForm(array &$form, FormStateInterface $form_state) {
     if (isset($_FILES['files']['name']) && is_array($_FILES['files']['name'])) {
       /* check if file is uploaded */
-      $existing_uploaded_A_file = default_value_for_uploaded_files("A", $form_state->getValue([
-        'prop_id'
-        ]));
-      $existing_uploaded_S_file = default_value_for_uploaded_files("S", $form_state->getValue([
-        'prop_id'
-        ]));
+      $proposal_id = (int) $form_state->getValue('prop_id');
+      $existing_uploaded_A_file = $this->getUploadedFile('A', $proposal_id);
+      $existing_uploaded_S_file = $this->getUploadedFile('S', $proposal_id);
       if (!$existing_uploaded_S_file) {
         if (empty($_FILES['files']['name']['upload_research_migration_developed_process'])) {
           $form_state->setErrorByName('upload_research_migration_developed_process', t('Please upload the file.'));
@@ -379,6 +372,17 @@ class EsimResearchMigrationUploadAbstractCodeForm extends FormBase {
       'research_migration_submitted_abstracts_list',
       'research_migration_submitted_abstracts_file_list',
     ]);
+  }
+
+  private function getUploadedFile(string $filetype, int $proposal_id): ?object {
+    return \Drupal::database()
+      ->select('research_migration_submitted_abstracts_file', 'f')
+      ->fields('f')
+      ->condition('proposal_id', $proposal_id)
+      ->condition('filetype', $filetype)
+      ->range(0, 1)
+      ->execute()
+      ->fetchObject() ?: NULL;
   }
 
 }
