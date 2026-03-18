@@ -456,23 +456,6 @@ function esim_research_migration_upload_abstract_code_form_submit($form, &$form_
 
     drupal_goto('research-migration-project/abstract-code');
 }
-function default_value_for_uploaded_files($filetype, $proposal_id)
-{
-    $query = \Drupal::database()->select('research_migration_submitted_abstracts_file');
-    $query->fields('research_migration_submitted_abstracts_file');
-    $query->condition('proposal_id', $proposal_id);
-    $selected_files_array = "";
-    if ($filetype == "S") {
-        $query->condition('filetype', $filetype);
-        $filetype_q = $query->execute()->fetchObject();
-        return $filetype_q;
-    } elseif ($filetype == "A") {
-        $query->condition('filetype', $filetype);
-        $filetype_q = $query->execute()->fetchObject();
-        return $filetype_q;
-    }
-    return;
-}
 function esim_research_migration_edit_upload_abstract_code_form($form, &$form_state)
 {
     $user = \Drupal::currentUser();
